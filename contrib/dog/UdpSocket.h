@@ -1,10 +1,16 @@
 #pragma once
 
 
+
+
 #include <boost/noncopyable.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/tuple/tuple.hpp>
+
 
 
 #include <muduo/net/InetAddress.h>
+#include "UdpMessage.h"
 
 
 
@@ -15,7 +21,12 @@ namespace muduo {
 namespace net {
     class UdpSocket : boost::noncopyable {
         public:
-            explicit UdpSocket();
+            enum  IPVersion {
+                IPV4 = 0,
+                IPV6 = 1,
+            };
+        public:
+            explicit UdpSocket(IPVersion version);
             ~UdpSocket();
 
             void BindAddress(const InetAddress& localaddr);
@@ -27,6 +38,9 @@ namespace net {
             void SetTosWithLowDelay();
 
             int sockfd() const { return sockfd_; }
+
+            boost::tuple<int, boost::shared_ptr<UdpMessage> > RecvMsg();
+            void SendMsg(const boost::shared_ptr<UdpMessage>& msg);
 
         private:
             static int createBlockingUDP(sa_family_t family);

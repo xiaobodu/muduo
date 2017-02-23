@@ -7,11 +7,8 @@ using namespace muduo;
 using namespace muduo::net;
 
 
-UdpMessage::UdpMessage(std::size_t defaultBufferSize)
-    : buffer_(defaultBufferSize) {}
+UdpMessage::UdpMessage(const boost::shared_ptr<Buffer>& buffer, const InetAddress& intetAddress)
+    : intetAddress_(intetAddress),
+      buffer_(buffer){}
 
-string UdpMessage::toIpPort() const {
-    char buf[64] = "";
-    sockets::toIpPort(buf, sizeof buf, sockets::sockaddr_cast(&fromAddr_));
-    return buf;
-}
+

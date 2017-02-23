@@ -15,14 +15,15 @@ namespace muduo {
 namespace net {
     class UdpMessage : public boost::noncopyable {
         public:
-            UdpMessage(std::size_t defaultBufferSize = 1472);
+            UdpMessage(const boost::shared_ptr<Buffer>& buffer, const InetAddress& intetAddress);
 
-            struct sockaddr_in& formAddr() { return fromAddr_; }
-            string toIpPort() const;
-            Buffer& buffer() { return buffer_; }
+            // source intetAddress with message recv
+            // destination intetAddress with message send;
+            const InetAddress& intetAddress() const { return intetAddress_; }
+            boost::shared_ptr<Buffer>&  buffer() { return buffer_; }
         private:
-            struct sockaddr_in fromAddr_;
-            Buffer buffer_;
+            InetAddress intetAddress_;
+            boost::shared_ptr<Buffer> buffer_;
     };
 }
 
