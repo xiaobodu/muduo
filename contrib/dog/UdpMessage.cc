@@ -7,8 +7,8 @@ using namespace muduo;
 using namespace muduo::net;
 
 
-UdpMessage::UdpMessage(const boost::shared_ptr<Buffer>& buffer, const InetAddress& intetAddress)
-    : intetAddress_(intetAddress),
-      buffer_(buffer){}
+UdpMessage::UdpMessage(const boost::shared_ptr<Buffer>& buf, const InetAddress& intetAddr)
+    : intetAddress_(intetAddr),
+      buffer_(buf){}
 
 
