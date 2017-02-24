@@ -11,4 +11,3 @@ UdpMessage::UdpMessage(const boost::shared_ptr<Buffer>& buf, const InetAddress& 
     : intetAddress_(intetAddr),
       buffer_(buf){}
 
-

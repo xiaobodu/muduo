@@ -1,2 +1,4 @@
 add_executable(UdpSocket_test UdpSocket_test.cc)
 target_link_libraries(UdpSocket_test muduo_net_dog)
+add_executable(UdpService_test UdpService_test.cc)
+target_link_libraries(UdpService_test muduo_net_dog)

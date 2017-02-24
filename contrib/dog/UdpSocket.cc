@@ -66,6 +66,30 @@ void UdpSocket::SetReusePort(bool on) {
 #endif
 }
 
+void UdpSocket::SetRecvTimeout(int millisecond) {
+    struct timeval timeout;
+    timeout.tv_sec = millisecond / 1000;
+    timeout.tv_usec = (millisecond % 1000) * 1000;
+    socklen_t len = sizeof(timeout);
+
+    int ret = setsockopt(sockfd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, len);
+    if (ret < 0) {
+        LOG_SYSERR << "SO_RCVTIMEO failed";
+    }
+}
+
+void UdpSocket::SetSendTimeout(int millisecond) {
+   struct timeval timeout;
+   timeout.tv_sec = millisecond / 1000;
+   timeout.tv_usec = (millisecond % 1000) * 1000;
+   socklen_t len = sizeof(timeout);
+   int ret = setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, len);
+   if (ret < 0) {
+       LOG_SYSERR << "SO_RCVTIMEO failed";
+   }
+}
+
+
 void UdpSocket::SetTosWithLowDelay() {
     unsigned char lowDelay = IPTOS_LOWDELAY;
     int ret = ::setsockopt(sockfd_, IPPROTO_IP, IP_TOS, &lowDelay, sizeof(lowDelay));
@@ -88,7 +112,7 @@ boost::tuple<int, boost::shared_ptr<UdpMessage> > UdpSocket::RecvMsg() {
         recvBuffer->hasWritten(nr);
         InetAddress intetAddress;
         intetAddress.setSockAddrInet6(*sockets::sockaddr_in6_cast(&fromAddr));
-        LOG_TRACE << "recvfrom return, readn = " << nr << "from " << intetAddress.toIpPort();
+        LOG_TRACE << "recvfrom return, readn = " << nr << " from " << intetAddress.toIpPort();
         return boost::make_tuple(0, boost::make_shared<UdpMessage>(recvBuffer, intetAddress));
     } else {
         LOG_SYSERR << "recvfrom return";

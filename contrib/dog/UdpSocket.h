@@ -37,6 +37,10 @@ namespace net {
 
             void SetTosWithLowDelay();
 
+            void SetRecvTimeout(int millisecond);
+
+            void SetSendTimeout(int millisecond);
+
             int sockfd() const { return sockfd_; }
 
             boost::tuple<int, boost::shared_ptr<UdpMessage> > RecvMsg();
