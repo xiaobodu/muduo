@@ -47,7 +47,7 @@ namespace net {
             void SendMsg(const boost::shared_ptr<UdpMessage>& msg);
 
         private:
-            static int createBlockingUDP(sa_family_t family);
+            static int createNonblockingUDP(sa_family_t family);
         private:
             const int sockfd_;
     };

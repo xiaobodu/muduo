@@ -1,5 +1,9 @@
+#include <errno.h>
 
 #include <boost/bind.hpp>
+#include <boost/make_shared.hpp>
+
+#include <muduo/net/SocketsOps.h>
 #include <muduo/base/Logging.h>
 #include "UdpService.h"
 
@@ -13,83 +17,133 @@ using namespace muduo::net;
 
 
 
-UdpService::UdpService(EventLoop* loop, const InetAddress& localaddr)
-    : loop_(CHECK_NOTNULL(loop)),
-      udpMsgRecvThread_(new muduo::Thread(boost::bind(&UdpService::runInUdpMsgRecvThread, this))),
-      udpMsgSendThread_(new muduo::Thread(boost::bind(&UdpService::runInUdpMsgSendThread, this))),
-      udpSocket_(localaddr.family() == PF_INET ? UdpSocket::IPV4 : UdpSocket::IPV6),
-      running_(false) {
+UdpService::UdpService(const InetAddress& localaddr)
+    : udpSocket_(localaddr.family() == PF_INET ? UdpSocket::IPV4 : UdpSocket::IPV6),
+      started_(false) {
 
     udpSocket_.SetReuseAddr(true);
     udpSocket_.SetReuseAddr(true);
     udpSocket_.SetTosWithLowDelay();
-    udpSocket_.SetRecvTimeout(500);
-
     udpSocket_.BindAddress(localaddr);
 }
 
 
 UdpService::~UdpService() {
-    loop_->assertInLoopThread();
-    Stop();
 }
 
 void UdpService::Start() {
-    if (running_) {
+    if (started_) {
         return;
     }
 
-    running_ = true;
+    started_ = true;
 
+    recvLoopThread_.reset(new EventLoopThread(boost::bind(&UdpService::recvLoopThreadInitCallback, this, _1)));
+    recvLoop_ = recvLoopThread_->startLoop();
 
-    udpMsgSendThread_->start();
-    udpMsgRecvThread_->start();
+    sendLoopThread_.reset(new EventLoopThread(boost::bind(&UdpService::sendLoopThreadInitCallback, this, _1)));
+    sendLoop_ = sendLoopThread_->startLoop();
 
     LOG_TRACE << "UdpService::Start";
 }
 
 void UdpService::Stop() {
-    if (loop_->isInLoopThread()) {
-        stopInLoop();
-    } else {
-        loop_->runInLoop(boost::bind(&UdpService::stopInLoop, this));
-    }
 }
 
-void UdpService::stopInLoop() {
-    if (!running_) {
+void UdpService::stopInRecvLoop() {
+    if (!started_) {
         return;
     }
 
-    running_ = false;
+    started_ = false;
 
-    udpMsgRecvThread_->join();
-    udpMsgSendThread_->join();
     LOG_TRACE << "UdpService::stopInLoop";
 }
 
-void UdpService::runInUdpMsgRecvThread() {
-    while (running_) {
-         int ret = 0;
-         UdpMessagePtr message;
-
-         boost::tie(ret, message) =  udpSocket_.RecvMsg();
-
-         if (ret >= 0) {
-             loop_->runInLoop(boost::bind(udpMessageCallback_, message));
-         }
-    }
-    LOG_TRACE << "UdpMsgRecvThread Stop";
+void UdpService::recvLoopThreadInitCallback(EventLoop* loop) {
+    channel_.reset(new Channel(loop, udpSocket_.sockfd()));
+    channel_->setReadCallback(boost::bind(&UdpService::handleRead, this, _1));
+    channel_->setWriteCallback(boost::bind(&UdpService::handleWrite, this));
+    channel_->setErrorCallback(boost::bind(&UdpService::handleError, this));
+    channel_->tie(shared_from_this());
+    channel_->enableReading();
 }
 
-void UdpService::runInUdpMsgSendThread() {
-    while(running_) {
-        udpSocket_.SendMsg(udpMsgSendQueue_.take());
-    }
-
-    LOG_TRACE << "UdpMsgSendThread stop";
+void UdpService::sendLoopThreadInitCallback(EventLoop* loop) {
+    (void)loop;
 }
+
+// runing in recvThread;
+void UdpService::handleRead(Timestamp receiveTime) {
+    LOG_TRACE << "UdpService " << receiveTime.toFormattedString();
+    recvLoop_->assertInLoopThread();
+
+    const std::size_t initialSize = 1472;
+
+    for (;;) {
+
+        struct sockaddr fromAddr;
+        ::bzero(&fromAddr, sizeof fromAddr);
+        socklen_t addrLen = sizeof fromAddr;
+        boost::shared_ptr<Buffer> recvBuffer = boost::make_shared<Buffer>(initialSize);
+
+        int savedError = 0;
+        ssize_t nr = ::recvfrom(udpSocket_.sockfd(), recvBuffer->beginWrite(),
+                recvBuffer->writableBytes(), 0, &fromAddr, &addrLen);
+        savedError = errno;
+
+        if (nr >= 0) {
+            recvBuffer->hasWritten(nr);
+            InetAddress intetAddress;
+            intetAddress.setSockAddrInet6(*sockets::sockaddr_in6_cast(&fromAddr));
+            udpMessageCallback_(shared_from_this(),
+                                boost::make_shared<UdpMessage>(recvBuffer, intetAddress),
+                                receiveTime);
+        } else {
+
+            if (savedError == EWOULDBLOCK || savedError == EAGAIN) {
+                return;
+            } else {
+                errno = savedError;
+                LOG_SYSERR << "UdpService::handleRead";
+                handleError();
+                return;
+            }
+        }
+    }
+}
+
+
+void UdpService::handleWrite() {
+    LOG_ERROR << "UdpService::handleWrite NOT implement";
+}
+
+void UdpService::handleError() {
+    int err = sockets::getSocketError(channel_->fd());
+    LOG_ERROR << "UdpService::handleError [" << name_
+        << "] - SO_ERROR = " << err << " " << strerror_tl(err);
+}
+
+
 
 void UdpService::SendMsg(UdpMessagePtr& msg) {
-    udpMsgSendQueue_.put(msg);
+
+    if (sendLoop_->isInLoopThread()) {
+        SendMsgInSendLoop(msg);
+    } else {
+        sendLoop_->runInLoop(boost::bind(&UdpService::SendMsgInSendLoop, this, msg));
+    }
+}
+
+void UdpService::SendMsgInSendLoop(UdpMessagePtr& msg) {
+    ssize_t nw = ::sendto(udpSocket_.sockfd(),
+                          msg->buffer()->peek(),
+                          msg->buffer()->readableBytes(),
+                          0,
+                          msg->intetAddress().getSockAddr(),
+                          sizeof(struct sockaddr_in6));
+    if (nw >= 0) {
+        msg->buffer()->retrieve(nw);
+    } else {
+    }
 }

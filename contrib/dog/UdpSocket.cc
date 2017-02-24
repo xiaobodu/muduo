@@ -19,14 +19,14 @@ using namespace muduo;
 using namespace muduo::net;
 
 UdpSocket::UdpSocket(IPVersion version)
-    : sockfd_(createBlockingUDP(version == IPV4 ? PF_INET : PF_INET6)) {
+    : sockfd_(createNonblockingUDP(version == IPV4 ? PF_INET : PF_INET6)) {
     }
 UdpSocket::~UdpSocket() {
     sockets::close(sockfd_);
 }
 
-int UdpSocket::createBlockingUDP(sa_family_t family) {
-    int sockfd = ::socket(family, SOCK_DGRAM | SOCK_CLOEXEC, IPPROTO_UDP);
+int UdpSocket::createNonblockingUDP(sa_family_t family) {
+    int sockfd = ::socket(family, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_UDP);
     if (sockfd < 0) {
         LOG_SYSFATAL << "::socket";
     }
