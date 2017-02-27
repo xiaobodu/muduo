@@ -82,11 +82,30 @@ void UdpSocket::SetSendTimeout(int millisecond) {
    struct timeval timeout;
    timeout.tv_sec = millisecond / 1000;
    timeout.tv_usec = (millisecond % 1000) * 1000;
-   socklen_t len = sizeof(timeout);
+   socklen_t len = sizeof timeout;
    int ret = setsockopt(sockfd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, len);
    if (ret < 0) {
        LOG_SYSERR << "SO_RCVTIMEO failed";
    }
+}
+
+void UdpSocket::SetRecvBuf(int bytes) {
+    socklen_t len = sizeof bytes;
+
+    int ret = setsockopt(sockfd_, SOL_SOCKET, SO_RCVBUF, &bytes, len);
+    if (ret < 0) {
+        LOG_SYSERR << "SO_RCVBUF failed";
+    }
+}
+
+void UdpSocket::SetSendBuf(int bytes) {
+    socklen_t len = sizeof bytes;
+
+    int ret = setsockopt(sockfd_, SOL_SOCKET, SO_SNDBUF, &bytes, len);
+
+    if (ret < 0) {
+        LOG_SYSERR << "SO_SNDBUF failed";
+    }
 }
 
 
@@ -97,6 +116,7 @@ void UdpSocket::SetTosWithLowDelay() {
         LOG_SYSERR << "Set IPTOS_LOWDELAY failed.";
     }
 }
+
 
 
 boost::tuple<int, boost::shared_ptr<UdpMessage> > UdpSocket::RecvMsg() {
