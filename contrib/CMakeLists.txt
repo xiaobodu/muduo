@@ -11,4 +11,4 @@ else()
 endif()
 
 
-add_subdirectory(dog)
+add_subdirectory(tkcp)
