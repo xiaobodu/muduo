@@ -3,6 +3,8 @@
 
 #include <sys/socket.h>
 
+#include <deque>
+
 #include <boost/shared_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -12,9 +14,12 @@
 #include <muduo/base/Thread.h>
 #include <muduo/base/Types.h>
 #include <muduo/base/BlockingQueue.h>
+#include <muduo/base/Timestamp.h>
 #include <muduo/net/InetAddress.h>
 #include <muduo/net/Socket.h>
 #include <muduo/net/EventLoop.h>
+#include <muduo/base/Mutex.h>
+#include <muduo/base/Condition.h>
 
 
 #include "UdpMessage.h"
@@ -48,6 +53,9 @@ namespace net {
             void runInUdpMsgSendThread();
             void stopInLoop();
 
+            void messageInloop(UdpMessagePtr message);
+            void messagePerSecond();
+
 
         private:
             EventLoop* loop_;
@@ -57,9 +65,13 @@ namespace net {
             boost::shared_ptr<muduo::Thread> udpMsgSendThread_;
 
 
-            BlockingQueue<UdpMessagePtr> udpMsgSendQueue_;
+            mutable MutexLock mutex_;
+            Condition notEmpty;
+            std::deque<UdpMessagePtr> queue_;
 
             UdpSocket udpSocket_;
+            Timestamp time_;
+            int count_;
 
             bool running_;
     };
