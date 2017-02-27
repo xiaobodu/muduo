@@ -13,6 +13,8 @@
 namespace muduo {
 
 namespace net {
+    class UdpMessage;
+    typedef boost::shared_ptr<UdpMessage> UdpMessagePtr;
     class UdpMessage : public boost::noncopyable {
         public:
             UdpMessage(const boost::shared_ptr<Buffer>& buf, const InetAddress& intetAddr);

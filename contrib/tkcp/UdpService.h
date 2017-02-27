@@ -34,7 +34,6 @@ namespace muduo {
 
 namespace net {
 
-    typedef boost::shared_ptr<UdpMessage> UdpMessagePtr;
     typedef boost::function<void(UdpMessagePtr)> UdpMessageCallback;
 
     class UdpService : public boost::noncopyable {

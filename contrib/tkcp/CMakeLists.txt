@@ -2,6 +2,7 @@ set(dog_SRCS
     UdpMessage.cc
     UdpService.cc
     UdpSocket.cc
+    TkcpSession.cc
     kcp/ikcp.c
     )
 
