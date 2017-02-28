@@ -23,7 +23,10 @@ namespace net {
                         public boost::enable_shared_from_this<TkcpSession> {
         public:
         public:
-            TkcpSession(EventLoop* loop, uint32_t conv, TcpConnectionPtr& tcpConnectionPtr);
+            TkcpSession(EventLoop* loop,
+                        uint32_t conv,
+                        InetAddress& localAddressForUdp,
+                        TcpConnectionPtr& tcpConnectionPtr);
             ~TkcpSession();
 
             EventLoop* GetLoop() const { return loop_; }
@@ -40,8 +43,10 @@ namespace net {
 
             uint32_t conv() const { return conv_; };
 
-            const InetAddress& peerAddrForUdp() { return peerAddrForUdp_; }
-            const InetAddress& peerAddrForTcp() { return tcpConnectionPtr_->peerAddress(); }
+            const InetAddress& localAddressForTcp() { return tcpConnectionPtr_->localAddress(); }
+            const InetAddress& LocalAddressForUdp() { return localAddressForUdp_; }
+            const InetAddress& peerAddressForUdp() { return peerAddressForUdp_; }
+            const InetAddress& peerAddressForTcp() { return tcpConnectionPtr_->peerAddress(); }
 
             void InUdpMessage(UdpMessagePtr& msg);
 
@@ -64,7 +69,8 @@ namespace net {
             TcpConnectionPtr tcpConnectionPtr_;
             StateE state_;
 
-            InetAddress peerAddrForUdp_;
+            InetAddress peerAddressForUdp_;
+            InetAddress localAddressForUdp_;
             ikcpcb* kcpcb_;
 
 

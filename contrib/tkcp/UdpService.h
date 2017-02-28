@@ -34,14 +34,14 @@ namespace muduo {
 
 namespace net {
 
-    typedef boost::function<void(UdpMessagePtr)> UdpMessageCallback;
+    typedef boost::function<void(UdpMessagePtr&)> UdpMessageCallback;
 
     class UdpService : public boost::noncopyable {
         public:
             UdpService(EventLoop* loop, const InetAddress& localaddr);
             ~UdpService();
             EventLoop* getLoop() const { return loop_; }
-            void SetUdpMessageCallback(UdpMessageCallback cb) { udpMessageCallback_ = cb; }
+            void SetUdpMessageCallback(const UdpMessageCallback& cb) { udpMessageCallback_ = cb; }
             void SendMsg(UdpMessagePtr& msg);
 
             void Start();

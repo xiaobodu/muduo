@@ -2,6 +2,7 @@
 
 #include <boost/function.hpp>
 #include <boost/function.hpp>
+#include <muduo/base/Timestamp.h>
 
 namespace muduo {
 
@@ -15,7 +16,13 @@ class TkcpSession;
 typedef boost::shared_ptr<TkcpSession> TkcpSessionPtr;
 typedef boost::function<void (const TkcpSessionPtr&)> TkcpConnectionCallback;
 typedef boost::function<void (const TkcpSessionPtr&)> TkcpCloseCallback;
-typedef boost::function<void (const TkcpSessionPtr&)> TkcpMessageCallback;
+typedef boost::function<void (const TkcpSessionPtr&, Buffer*, Timestamp)> TkcpMessageCallback;
+
+
+void defaultTkcpConnectionCallback(const TkcpSessionPtr& conn);
+void defaultTkcpMessageCallback(const TkcpSessionPtr& conn,
+                                Buffer* buffer,
+                                Timestamp receiveTime);
 
 }
 
