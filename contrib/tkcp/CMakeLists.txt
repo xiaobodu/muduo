@@ -4,6 +4,8 @@ set(dog_SRCS
     UdpSocket.cc
     TkcpSession.cc
     TkcpServer.cc
+    Coding.cc
+    Packet.cc
     kcp/ikcp.c
     )
 

@@ -23,10 +23,9 @@ namespace net {
                         public boost::enable_shared_from_this<TkcpSession> {
         public:
         public:
-            TkcpSession(EventLoop* loop,
-                        uint32_t conv,
-                        InetAddress& localAddressForUdp,
-                        TcpConnectionPtr& tcpConnectionPtr);
+            TkcpSession(uint32_t conv,
+                        const InetAddress& localAddressForUdp,
+                        const TcpConnectionPtr& tcpConnectionPtr);
             ~TkcpSession();
 
             EventLoop* GetLoop() const { return loop_; }
@@ -37,9 +36,9 @@ namespace net {
 
 
             void SetUdpOutCallback(const UdpOutputCallback& cb) { udpOutputCallback_ = cb; }
-            void SetTkcpCloseCallback(TkcpCloseCallback& cb) { tkcpCloseCallback_ = cb; }
-            void SetTkcpConnectionCallback(TkcpConnectionCallback& cb) { tkcpConnectionCallback_ = cb; }
-            void SetTkcpMessageCallback(TkcpMessageCallback& cb) { tkcpMessageCallback_ = cb ; }
+            void SetTkcpCloseCallback(const TkcpCloseCallback& cb) { tkcpCloseCallback_ = cb; }
+            void SetTkcpConnectionCallback(const TkcpConnectionCallback& cb) { tkcpConnectionCallback_ = cb; }
+            void SetTkcpMessageCallback(const TkcpMessageCallback& cb) { tkcpMessageCallback_ = cb ; }
 
             uint32_t conv() const { return conv_; };
 
@@ -50,6 +49,10 @@ namespace net {
 
             void InUdpMessage(UdpMessagePtr& msg);
 
+            void SyncUdpConnectionInfo();
+            void onTcpConnection(const TcpConnectionPtr& conn);
+            void onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp receiveTime);
+
         private:
             enum StateE { KDisconnected, KConnecting, KConnected, kDisconnecting };
 
@@ -58,9 +61,6 @@ namespace net {
             static int KcpOutput(const char* buf, int len, struct IKCPCB* kcp, void *user);
 
             void setState(StateE s) { state_ = s; }
-
-            void onTcpConnection(const TcpConnectionPtr& conn);
-            void onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp receiveTime);
 
         private:
             EventLoop* loop_;

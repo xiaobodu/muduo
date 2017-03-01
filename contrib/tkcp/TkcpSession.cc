@@ -3,9 +3,11 @@
 
 #include <muduo/base/Logging.h>
 #include <muduo/base/Types.h>
+#include <muduo/net/Buffer.h>
 #include <stdint.h>
 #include "TkcpSession.h"
-#include "TkcpDefine.h"
+#include "Packet.h"
+#include "Coding.h"
 
 namespace muduo {
 
@@ -24,16 +26,14 @@ void defaultTkcpMessageCallback(const TkcpSessionPtr&, Buffer* buf, Timestamp) {
     buf->retrieveAll();
 }
 
-TkcpSession::TkcpSession(EventLoop* loop, uint32_t conv, InetAddress& localAddressForUdp, TcpConnectionPtr& tcpConnectionPtr)
-    : loop_(CHECK_NOTNULL(loop)),
+TkcpSession::TkcpSession(uint32_t conv, const InetAddress& localAddressForUdp, const TcpConnectionPtr& tcpConnectionPtr)
+    : loop_(tcpConnectionPtr->getLoop()),
       conv_(conv),
       tcpConnectionPtr_(tcpConnectionPtr),
       state_(KConnecting),
       localAddressForUdp_(localAddressForUdp),
       kcpcb_(NULL) {
 
-      tcpConnectionPtr_->setConnectionCallback(boost::bind(&TkcpSession::onTcpConnection, shared_from_this(), _1));
-      tcpConnectionPtr_->setMessageCallback(boost::bind(&TkcpSession::onTcpMessage, shared_from_this(), _1, _2, _3));
 
 }
 
@@ -59,16 +59,17 @@ int TkcpSession::KcpOutput(const char* buf, int len, struct IKCPCB* kcp, void *u
 }
 
 
-// conv +  cmd + data : msg 中 conv 已读出 只剩 cmd + data
 void TkcpSession::InUdpMessage(UdpMessagePtr& msg) {
-    int8_t cmd = msg->buffer()->readInt8();
-
-    switch (cmd) {
-        case kUdpCmdData:
+    uint32_t conv = DecodeUint32(msg->buffer().get());
+    uint8_t packeId = DecodeUint8(msg->buffer().get());
+    switch (packeId) {
+        case packet::udp::kData:
             ikcp_input(kcpcb_, msg->buffer()->peek(), msg->buffer()->readableBytes());
             msg->buffer()->retrieveAll();
             break;
-        case kUdpCmdConnectionSyncC2S:
+        case packet::udp::kConnectSyn:
+            LOG_DEBUG << "recv KConnectSyn udpmsg from conv " << conv;
+
             break;
 
         default:
@@ -77,8 +78,23 @@ void TkcpSession::InUdpMessage(UdpMessagePtr& msg) {
 }
 
 
-void TkcpSession::onTcpConnection(const TcpConnectionPtr& conn) {
+void TkcpSession::SyncUdpConnectionInfo() {
+    Buffer sendbuf(64);
+    packet::tcp::UdpConnectionInfo connInfo;
+    connInfo.packetId= packet::tcp::kUdpConnectionInfo;
+    connInfo.conv = conv_;
+    connInfo.ip = localAddressForUdp_.toIp();
+    connInfo.port = localAddressForUdp_.toPort();
+    connInfo.Encode(&sendbuf);
 
+
+    tcpConnectionPtr_->send(&sendbuf);
+}
+
+
+void TkcpSession::onTcpConnection(const TcpConnectionPtr& conn) {
+    LOG_DEBUG << "tcp conn " << "from " << conn->peerAddress().toIpPort()
+        << " " << (conn->connected() ? "UP" : "DOWN");
 }
 
 
@@ -90,7 +106,7 @@ void TkcpSession::onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timest
             buf->retrieveInt16();
             int8_t cmd = buf->readInt8();
             switch(cmd) {
-                case kTcpCmdData:
+                case packet::tcp::kData:
                     {
                         std::size_t datalen =  implicit_cast<std::size_t>(len-sizeof(uint16_t)-sizeof(int8_t));
                         Buffer message(datalen);

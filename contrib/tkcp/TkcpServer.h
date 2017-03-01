@@ -66,7 +66,7 @@ class TkcpServer : boost::noncopyable {
 
     AtomicInt32 started_;
 
-    uint32_t nextConnId_;
+    uint32_t nextConv_;
     SessionMap sessions_;
 
     UdpService udpService_;

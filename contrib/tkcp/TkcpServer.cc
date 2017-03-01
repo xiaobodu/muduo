@@ -4,7 +4,6 @@
 #include <muduo/base/Logging.h>
 
 #include "TkcpServer.h"
-#include "TkcpDefine.h"
 
 
 
@@ -23,7 +22,7 @@ TkcpServer::TkcpServer(EventLoop* loop,
       name_(nameArg),
       tkcpConnectionCallback_(defaultTkcpConnectionCallback),
       tkcpMessageCallback_(defaultTkcpMessageCallback),
-      nextConnId_(1),
+      nextConv_(1),
       udpService_(loop, udpListenAddr),
       tcpserver_(loop, tcpListenAddr, nameArg+":Tkcp") {
 
@@ -45,14 +44,17 @@ void TkcpServer::newTcpConnection(const TcpConnectionPtr& conn) {
     LOG_DEBUG << "tcp conn " << "from " << conn->peerAddress().toIpPort()
               << " " << (conn->connected() ? "UP" : "DOWN");
     if (conn->connected()) {
+        uint32_t conv = nextConv_++;
+        TkcpSessionPtr sess = TkcpSessionPtr(new TkcpSession(conv, udpListenAddress_, conn));
+        conn->setConnectionCallback(boost::bind(&TkcpSession::onTcpConnection, sess, _1));
+        conn->setMessageCallback(boost::bind(&TkcpSession::onTcpMessage, sess, _1, _2, _3));
 
-        Buffer buf;
-        size_t dataLen = sizeof(uint16_t) + sizeof(int8_t) + udpListenAddress_.toIpPort().size();
-        buf.appendInt16(static_cast<int16_t>(dataLen));
-        buf.appendInt8(KTcpCmdConnectionSyncS2C);
-        buf.append(udpListenAddress_.toIpPort().c_str(), udpListenAddress_.toIpPort().size());
+        sessions_[conv] = sess;
+        sess->SetTkcpConnectionCallback(tkcpConnectionCallback_);
+        sess->SetTkcpMessageCallback(tkcpMessageCallback_);
+        sess->SetTkcpCloseCallback(boost::bind(&TkcpServer::removeTckpSession, this, _1));
 
-        conn->send(&buf);
+        sess->GetLoop()->runInLoop(boost::bind(&TkcpSession::SyncUdpConnectionInfo, sess));
     }
 
 
@@ -60,13 +62,22 @@ void TkcpServer::newTcpConnection(const TcpConnectionPtr& conn) {
 }
 
 void TkcpServer::removeTckpSession(const TkcpSessionPtr& sess) {
+
 }
 
 void TkcpServer::removeTckpSessionInLoop(const TkcpSessionPtr& sess) {
+
 }
 
 void TkcpServer::onUdpMessage(UdpMessagePtr& msg) {
     LOG_DEBUG << "new udp message from " << msg->intetAddress().toIpPort();
+    uint32_t conv = static_cast<uint32_t>(msg->buffer()->peekInt32());
+
+    SessionMap::const_iterator iter = sessions_.find(conv);
+
+    if (iter != sessions_.end()) {
+        iter->second->InUdpMessage(msg);
+    }
 }
 
 }
