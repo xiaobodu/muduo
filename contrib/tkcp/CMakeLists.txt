@@ -6,6 +6,7 @@ set(dog_SRCS
     TkcpServer.cc
     Coding.cc
     Packet.cc
+    TkcpClient.cc
     kcp/ikcp.c
     )
 

@@ -53,12 +53,17 @@ void TkcpServer::newTcpConnection(const TcpConnectionPtr& conn) {
         sess->SetTkcpConnectionCallback(tkcpConnectionCallback_);
         sess->SetTkcpMessageCallback(tkcpMessageCallback_);
         sess->SetTkcpCloseCallback(boost::bind(&TkcpServer::removeTckpSession, this, _1));
+        sess->SetUdpOutCallback(boost::bind(&TkcpServer::outPutUdpMessage, this, _1, _2, _3));
 
         sess->GetLoop()->runInLoop(boost::bind(&TkcpSession::SyncUdpConnectionInfo, sess));
     }
 
+}
 
-
+int TkcpServer::outPutUdpMessage(const TkcpSessionPtr& sess, const char* buf, size_t len) {
+    UdpMessagePtr message(new UdpMessage(buf, len, sess->peerAddressForUdp()));
+    udpService_.SendMsg(message);
+    return 0;
 }
 
 void TkcpServer::removeTckpSession(const TkcpSessionPtr& sess) {
@@ -76,7 +81,7 @@ void TkcpServer::onUdpMessage(UdpMessagePtr& msg) {
     SessionMap::const_iterator iter = sessions_.find(conv);
 
     if (iter != sessions_.end()) {
-        iter->second->InUdpMessage(msg);
+        iter->second->InputUdpMessage(msg);
     }
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -17,7 +18,8 @@ namespace net {
     typedef boost::shared_ptr<UdpMessage> UdpMessagePtr;
     class UdpMessage : public boost::noncopyable {
         public:
-            UdpMessage(const boost::shared_ptr<Buffer>& buf, const InetAddress& intetAddr);
+            UdpMessage(const boost::shared_ptr<Buffer>& buf, const InetAddress& inetAddr);
+            UdpMessage(const char* buf, size_t len, const InetAddress& intetAddr);
 
             // source intetAddress with message recv
             // destination intetAddress with message send;

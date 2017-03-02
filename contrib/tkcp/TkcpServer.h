@@ -1,5 +1,8 @@
 #pragma once
 
+
+#include <stddef.h>
+
 #include <map>
 
 #include <boost/noncopyable.hpp>
@@ -52,6 +55,7 @@ class TkcpServer : boost::noncopyable {
         void removeTckpSessionInLoop(const TkcpSessionPtr& sess);
 
         void onUdpMessage(UdpMessagePtr& msg);
+        int outPutUdpMessage(const TkcpSessionPtr& sess, const char* buf, size_t len);
 
     private:
 

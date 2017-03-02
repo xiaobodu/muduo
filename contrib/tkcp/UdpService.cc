@@ -1,6 +1,13 @@
 
+
+#include <stddef.h>
+
 #include <boost/bind.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include <muduo/base/Logging.h>
+#include <muduo/net/Buffer.h>
+#include <muduo/net/SocketsOps.h>
 #include "UdpService.h"
 
 
@@ -81,14 +88,30 @@ void UdpService::stopInLoop() {
 
 void UdpService::runInUdpMsgRecvThread() {
     while (running_) {
-         int ret = 0;
-         UdpMessagePtr message;
+         const size_t initialSize = 1472;
+         struct sockaddr fromAddr;
+         ::bzero(&fromAddr, sizeof(fromAddr));
+         socklen_t addrLen = sizeof(fromAddr);
 
-         boost::tie(ret, message) =  udpSocket_.RecvMsg();
+         boost::shared_ptr<Buffer> recvBuffer = boost::make_shared<Buffer>(initialSize);
 
-         if (ret >= 0) {
-             loop_->runInLoop(boost::bind(&UdpService::messageInloop, this, message));
+         ssize_t nr = ::recvfrom(udpSocket_.sockfd(),
+                                 recvBuffer->beginWrite(),
+                                 recvBuffer->writableBytes(),
+                                 0,
+                                 &fromAddr,
+                                 &addrLen);
+
+         if (nr >= 0) {
+            recvBuffer->hasWritten(nr);
+            InetAddress intetAddress;
+            intetAddress.setSockAddrInet6(*sockets::sockaddr_in6_cast(&fromAddr));
+            loop_->runInLoop(boost::bind(&UdpService::messageInloop, this, boost::make_shared<UdpMessage>(recvBuffer, intetAddress)));
+            LOG_TRACE << "recvfrom return, readn = " << nr << " from " << intetAddress.toIpPort();
+         } else {
+             LOG_SYSERR << "recvfrom return";
          }
+
     }
     LOG_TRACE << "UdpMsgRecvThread Stop";
 }
@@ -119,7 +142,18 @@ void UdpService::runInUdpMsgSendThread() {
         }
 
         if (message) {
-            udpSocket_.SendMsg(message);
+
+            ssize_t nw = ::sendto(udpSocket_.sockfd(),
+                                  message->buffer()->peek(),
+                                  message->buffer()->readableBytes(),
+                                  0,
+                                  message->intetAddress().getSockAddr(),
+                                  sizeof(struct sockaddr_in6));
+            if (nw >= 0) {
+                message->buffer()->retrieve(nw);
+            } else {
+                LOG_SYSERR << "sendto failed";
+            }
         }
 
     }
@@ -127,7 +161,7 @@ void UdpService::runInUdpMsgSendThread() {
     LOG_TRACE << "UdpMsgSendThread stop";
 }
 
-void UdpService::SendMsg(UdpMessagePtr& msg) {
+void UdpService::SendMsg(const UdpMessagePtr& msg) {
     MutexLockGuard lock(mutex_);
     queue_.push_back(msg);
     notEmpty.notify();

@@ -26,10 +26,11 @@ namespace net {
                 IPV6 = 1,
             };
         public:
-            explicit UdpSocket(IPVersion version);
+            explicit UdpSocket(IPVersion version, bool nonblock = false);
             ~UdpSocket();
 
             void BindAddress(const InetAddress& localaddr);
+            int ConnectAddress(const InetAddress& peerAddress);
 
             void SetReuseAddr(bool on);
 
@@ -50,7 +51,7 @@ namespace net {
             void SendMsg(const boost::shared_ptr<UdpMessage>& msg);
 
         private:
-            static int createBlockingUDP(sa_family_t family);
+            static int createUDP(sa_family_t family, bool nonblock = false);
         private:
             const int sockfd_;
     };

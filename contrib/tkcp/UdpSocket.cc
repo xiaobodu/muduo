@@ -18,14 +18,19 @@
 using namespace muduo;
 using namespace muduo::net;
 
-UdpSocket::UdpSocket(IPVersion version)
-    : sockfd_(createBlockingUDP(version == IPV4 ? PF_INET : PF_INET6)) {
+UdpSocket::UdpSocket(IPVersion version, bool nonblock)
+    : sockfd_(createUDP(version == IPV4 ? PF_INET : PF_INET6, nonblock)) {
     }
 UdpSocket::~UdpSocket() {
     sockets::close(sockfd_);
 }
 
-int UdpSocket::createBlockingUDP(sa_family_t family) {
+int UdpSocket::createUDP(sa_family_t family, bool nonblock) {
+    int type = SOCK_DGRAM | SOCK_CLOEXEC;
+    if (nonblock) {
+        type = type | SOCK_NONBLOCK;
+    }
+
     int sockfd = ::socket(family, SOCK_DGRAM | SOCK_CLOEXEC, IPPROTO_UDP);
     if (sockfd < 0) {
         LOG_SYSFATAL << "::socket";
@@ -37,6 +42,9 @@ void UdpSocket::BindAddress(const InetAddress& localaddr) {
     sockets::bindOrDie(sockfd_, localaddr.getSockAddr());
 }
 
+int UdpSocket::ConnectAddress(const InetAddress& peerAddress) {
+    return sockets::connect(sockfd_, peerAddress.getSockAddr());
+}
 
 
 void UdpSocket::SetReuseAddr(bool on) {
@@ -119,38 +127,3 @@ void UdpSocket::SetTosWithLowDelay() {
 
 
 
-boost::tuple<int, boost::shared_ptr<UdpMessage> > UdpSocket::RecvMsg() {
-    const std::size_t initialSize = 1472;
-    struct sockaddr fromAddr;
-    ::bzero(&fromAddr, sizeof fromAddr);
-    socklen_t addrLen = sizeof fromAddr;
-    boost::shared_ptr<Buffer> recvBuffer = boost::make_shared<Buffer>(initialSize);
-    ssize_t nr = ::recvfrom(sockfd_, recvBuffer->beginWrite(),
-            recvBuffer->writableBytes(), 0, &fromAddr, &addrLen);
-
-    if (nr >= 0) {
-        recvBuffer->hasWritten(nr);
-        InetAddress intetAddress;
-        intetAddress.setSockAddrInet6(*sockets::sockaddr_in6_cast(&fromAddr));
-        LOG_TRACE << "recvfrom return, readn = " << nr << " from " << intetAddress.toIpPort();
-        return boost::make_tuple(0, boost::make_shared<UdpMessage>(recvBuffer, intetAddress));
-    } else {
-        LOG_SYSERR << "recvfrom return";
-        return boost::make_tuple(-1, boost::shared_ptr<UdpMessage>());
-    }
-}
-
-
-void UdpSocket::SendMsg(const boost::shared_ptr<UdpMessage>& msg) {
-    ssize_t nw = ::sendto(sockfd_,
-                      msg->buffer()->peek(),
-                      msg->buffer()->readableBytes(),
-                      0,
-                      msg->intetAddress().getSockAddr(),
-                      sizeof(struct sockaddr_in6));
-    if (nw >= 0) {
-        msg->buffer()->retrieve(nw);
-    } else {
-        LOG_SYSERR << "sendto failed";
-    }
-}

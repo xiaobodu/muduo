@@ -42,7 +42,7 @@ namespace net {
             ~UdpService();
             EventLoop* getLoop() const { return loop_; }
             void SetUdpMessageCallback(const UdpMessageCallback& cb) { udpMessageCallback_ = cb; }
-            void SendMsg(UdpMessagePtr& msg);
+            void SendMsg(const UdpMessagePtr& msg);
 
             void Start();
             void Stop();

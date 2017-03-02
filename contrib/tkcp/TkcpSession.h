@@ -2,6 +2,7 @@
 
 
 #include <stdint.h>
+#include <stddef.h>
 #include <boost/noncopyable.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
@@ -18,7 +19,7 @@
 namespace muduo {
 
 namespace net {
-    typedef boost::function<int(const TkcpSessionPtr&, const char *, int)> UdpOutputCallback;
+    typedef boost::function<int(const TkcpSessionPtr&, const char *, size_t)> UdpOutputCallback;
     class TkcpSession : public boost::noncopyable,
                         public boost::enable_shared_from_this<TkcpSession> {
         public:
@@ -42,22 +43,38 @@ namespace net {
 
             uint32_t conv() const { return conv_; };
 
+
             const InetAddress& localAddressForTcp() { return tcpConnectionPtr_->localAddress(); }
             const InetAddress& LocalAddressForUdp() { return localAddressForUdp_; }
             const InetAddress& peerAddressForUdp() { return peerAddressForUdp_; }
             const InetAddress& peerAddressForTcp() { return tcpConnectionPtr_->peerAddress(); }
 
-            void InUdpMessage(UdpMessagePtr& msg);
+            void InputUdpMessage(UdpMessagePtr& msg);
 
             void SyncUdpConnectionInfo();
             void onTcpConnection(const TcpConnectionPtr& conn);
             void onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp receiveTime);
 
         private:
+            //for udp begin
+            void onConnectSyn();
+            void onConnectSyncAck();
+            void onConnectAck();
+            void onPingRequest();
+            void onPingReply();
+            void onUdpData(const char* buf, size_t len);
+            //for udp end
+
+            //for tcp begin
+            void onUdpconnectionInfo(Buffer* buf);
+            void onTcpData(Buffer* buf);
+            //for tcp end
+
+        private:
             enum StateE { KDisconnected, KConnecting, KConnected, kDisconnecting };
 
         private:
-            int handleKcpout(const char* buf, int len);
+            int handleKcpOutput(const char* buf, int len);
             static int KcpOutput(const char* buf, int len, struct IKCPCB* kcp, void *user);
 
             void setState(StateE s) { state_ = s; }

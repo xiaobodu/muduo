@@ -31,17 +31,6 @@ int main(void)
     v4Socket.SetReusePort(true);
     v4Socket.SetTosWithLowDelay();
     v4Socket.BindAddress(v4Addr);
-    typedef boost::shared_ptr<UdpMessage> UdpMessagePtr;
-    for (;;) {
-        int ret = 0;
-        UdpMessagePtr message;
-
-        boost::tie(ret, message) = v4Socket.RecvMsg();
-
-        if (ret >= 0) {
-            v4Socket.SendMsg(message);
-        }
-    }
 
     return 0;
 }
