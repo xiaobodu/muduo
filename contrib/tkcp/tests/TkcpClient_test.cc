@@ -14,7 +14,8 @@ using namespace muduo::net;
 
 
 void OnMessage(const TkcpSessionPtr& conn, Buffer* buffer) {
-    printf("%s\n", buffer->retrieveAllAsString().c_str());
+    string hello(buffer->peek(), buffer->readableBytes());
+    LOG_DEBUG << "received " << hello;
 }
 
 void OnConnection(const TkcpSessionPtr& conn) {

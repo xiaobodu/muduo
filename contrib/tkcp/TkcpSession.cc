@@ -113,7 +113,11 @@ void TkcpSession::SendKcpMsg(const void *data, size_t len) {
 
 int TkcpSession::handleKcpOutput(const char* buf, int len) {
     if (udpOutputCallback_) {
-        return udpOutputCallback_(shared_from_this(), buf, len);
+        Buffer message;
+        EncodeUint32(&message, conv_);
+        EncodeUint8(&message, packet::udp::kData);
+        message.append(buf, static_cast<size_t>(len));
+        return udpOutputCallback_(shared_from_this(), message.peek(), message.readableBytes());
     }
     return 0;
 }
@@ -215,7 +219,9 @@ void TkcpSession::onUdpData(const char* buf, size_t len) {
     int size = ikcp_peeksize(kcpcb_);
     if (size > 0) {
         Buffer message(static_cast<size_t>(size));
-        message.append(buf, len);
+        int nr = ikcp_recv(kcpcb_, message.beginWrite(), static_cast<int>(message.writableBytes()));
+        assert(size == nr);
+        message.hasWritten(nr);
         tkcpMessageCallback_(shared_from_this(), &message);
     }
 }
