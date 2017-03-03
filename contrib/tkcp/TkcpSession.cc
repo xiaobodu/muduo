@@ -1,11 +1,13 @@
 
 #include <stddef.h>
+#include <sys/time.h>
 
 #include <boost/bind.hpp>
 
 #include <muduo/base/Logging.h>
 #include <muduo/base/Types.h>
 #include <muduo/net/Buffer.h>
+#include <muduo/net/EventLoop.h>
 #include <stdint.h>
 #include "TkcpSession.h"
 #include "Packet.h"
@@ -14,6 +16,23 @@
 namespace muduo {
 
 namespace net {
+
+
+
+const int KMicroSecondsPerMillissecond = 1000;
+const int kMillissecondsPerSecond = 1000;
+static double MillisecondToSecond(int millisecond) {
+    return static_cast<double>(millisecond) / kMillissecondsPerSecond;
+}
+
+static uint32_t Clock() {
+    struct timeval tv;
+    ::gettimeofday(&tv, NULL);
+    uint64_t millisecond = static_cast<uint64_t>(tv.tv_sec) * kMillissecondsPerSecond+
+                           (tv.tv_usec / KMicroSecondsPerMillissecond);
+
+    return static_cast<uint32_t>(millisecond & 0xfffffffful);
+}
 
 
 void defaultTkcpConnectionCallback(const TkcpSessionPtr& conn) {
@@ -40,10 +59,55 @@ TkcpSession::TkcpSession(uint32_t conv, const InetAddress& localAddressForUdp, c
 }
 
 TkcpSession::~TkcpSession() {
-    if (kcpcb_ != NULL) {
-        ikcp_release(kcpcb_);
-        kcpcb_ = NULL;
+    assert(kcpcb_ == NULL);
+}
+
+void TkcpSession::Send(const void* data, int len) {
+    Send(StringPiece(static_cast<const char*>(data), len));
+}
+
+void TkcpSession::Send(const StringPiece& message) {
+    if (state_ == KConnected) {
+        if (loop_->isInLoopThread()) {
+            SendInLoop(message);
+        } else {
+            loop_->runInLoop(boost::bind(&TkcpSession::SendInLoop,
+                                         this,
+                                         message.as_string()));
+        }
     }
+}
+
+void TkcpSession::Send(Buffer* buf) {
+    if (state_ == KConnected) {
+        if (loop_->isInLoopThread()) {
+            SendInLoop(buf->peek(), buf->readableBytes());
+            buf->retrieveAll();
+        } else {
+            loop_->runInLoop(boost::bind(&TkcpSession::SendInLoop,
+                                         this,
+                                         buf->retrieveAllAsString()));
+        }
+    }
+}
+
+void TkcpSession::SendInLoop(const StringPiece& message) {
+    SendInLoop(message.data(), message.size());
+}
+
+void TkcpSession::SendInLoop(const void *data, size_t len) {
+    loop_->assertInLoopThread();
+    if (state_ == KDisconnected) {
+        LOG_WARN << "Disconnected, give up writing";
+        return;
+    }
+
+    SendKcpMsg(data, len);
+}
+
+void TkcpSession::SendKcpMsg(const void *data, size_t len) {
+
+    ikcp_send(kcpcb_, static_cast<const char*>(data), static_cast<int>(len));
 }
 
 
@@ -54,14 +118,15 @@ int TkcpSession::handleKcpOutput(const char* buf, int len) {
     return 0;
 }
 
-int TkcpSession::KcpOutput(const char* buf, int len, struct IKCPCB* kcp, void *user) {
+int TkcpSession::kcpOutput(const char* buf, int len, struct IKCPCB* kcp, void *user) {
     (void)kcp;
     TkcpSession* sess = static_cast<TkcpSession*>(user);
     return sess->handleKcpOutput(buf, len);
 }
 
-
+// safe
 void TkcpSession::InputUdpMessage(UdpMessagePtr& msg) {
+    loop_->assertInLoopThread();
     peerAddressForUdp_ = msg->intetAddress();
     uint32_t conv = DecodeUint32(msg->buffer().get());
     uint8_t packeId = DecodeUint8(msg->buffer().get());
@@ -105,9 +170,37 @@ void TkcpSession::onConnectSyncAck() {
     EncodeUint32(&sendbuf, conv_);
     EncodeUint8(&sendbuf, packet::udp::kConnectAck);
     udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
+    initKcp(); // client
 }
 
 void TkcpSession::onConnectAck() {
+    initKcp(); // server
+}
+
+void TkcpSession::kcpUpdate() {
+    uint32_t now =  Clock();
+    ikcp_update(kcpcb_, now);
+    uint32_t  nextTime = ikcp_check(kcpcb_, now);
+
+    loop_->runAfter(MillisecondToSecond(nextTime),
+                    boost::bind(&TkcpSession::kcpUpdate, this));
+}
+
+
+void TkcpSession::initKcp() {
+    assert(kcpcb_ == NULL);
+    kcpcb_  = ikcp_create(conv_, this);
+    ikcp_setoutput(kcpcb_, kcpOutput);
+    ikcp_nodelay(kcpcb_, 1, 10, 2, 1);
+    ikcp_wndsize(kcpcb_, 128, 128);
+    ikcp_setmtu(kcpcb_, 576 - 64 - packet::udp::kPacketHeadLength);
+    kcpcb_->rx_minrto = 10;
+
+    loop_->runAfter(MillisecondToSecond(kcpcb_->interval),
+                    boost::bind(&TkcpSession::kcpUpdate, this));
+
+    setState(KConnected);
+    tkcpConnectionCallback_(shared_from_this());
 }
 
 void TkcpSession::onPingRequest() {
@@ -117,9 +210,14 @@ void TkcpSession::onPingReply() {
 }
 
 void TkcpSession::onUdpData(const char* buf, size_t len) {
-    Buffer message(len);
-    message.append(buf, len);
-    tkcpMessageCallback_(shared_from_this(), &message);
+    ikcp_input(kcpcb_, buf, static_cast<int>(len));
+
+    int size = ikcp_peeksize(kcpcb_);
+    if (size > 0) {
+        Buffer message(static_cast<size_t>(size));
+        message.append(buf, len);
+        tkcpMessageCallback_(shared_from_this(), &message);
+    }
 }
 
 
@@ -138,12 +236,14 @@ void TkcpSession::SyncUdpConnectionInfo() {
 
 
 void TkcpSession::onTcpConnection(const TcpConnectionPtr& conn) {
+    loop_->assertInLoopThread();
     LOG_DEBUG << "tcp conn " << "from " << conn->peerAddress().toIpPort()
         << " " << (conn->connected() ? "UP" : "DOWN");
 }
 
 
 void TkcpSession::onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp receiveTime) {
+    loop_->assertInLoopThread();
     while (buf->readableBytes() > packet::tcp::kPacketHeadLength) {
 
         Buffer headBuf;
@@ -196,6 +296,16 @@ void TkcpSession::onTcpData(Buffer* buf) {
     tkcpMessageCallback_(shared_from_this(), &message);
 }
 
+void TkcpSession::ConnectDestroyed() {
+    loop_->assertInLoopThread();
+    if (state_ == KConnected) {
+        setState(KDisconnected);
+        tkcpConnectionCallback_(shared_from_this());
+    }
+    loop_->cancel(kcpUpdateTimer);
+    ikcp_release(kcpcb_);
+    kcpcb_ = NULL;
+}
 
 
 }

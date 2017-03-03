@@ -9,6 +9,14 @@
 using namespace muduo;
 using namespace muduo::net;
 
+void OnConnection(const TkcpSessionPtr& sess) {
+    LOG_DEBUG << "New TkcpConn";
+}
+
+void OnMessage(const TkcpSessionPtr& sess, Buffer* buffer) {
+    sess->Send(buffer);
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -25,6 +33,8 @@ int main(int argc, char* argv[])
     EventLoop loop;
 
     TkcpServer server(&loop, tcpAddr, udpaddr, "test");
+    server.SetTkcpConnectionCallback(OnConnection);
+    server.SetTkcpMessageCallback(OnMessage);
 
     server.Start();
 

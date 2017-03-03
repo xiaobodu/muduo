@@ -50,7 +50,7 @@ string  PacketIdToString(uint8_t packetId);
 
 namespace udp {
 
-const size_t kPacketHeadLength = 3;
+const size_t kPacketHeadLength = 5;
 struct UdpPacketHead {
     uint32_t conv;
     uint8_t  packetId;

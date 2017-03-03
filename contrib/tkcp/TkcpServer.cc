@@ -1,4 +1,6 @@
 
+#include <stddef.h>
+#include <assert.h>
 #include <boost/bind.hpp>
 
 #include <muduo/base/Logging.h>
@@ -32,7 +34,19 @@ TkcpServer::TkcpServer(EventLoop* loop,
 }
 
 TkcpServer::~TkcpServer() {
+    loop_->assertInLoopThread();
+    LOG_TRACE << "TkcpServer::~TkcpServer [" << name_ << "] destructing";
+
+    for (SessionMap::iterator it(sessions_.begin());
+         it != sessions_.end(); ++it) {
+
+        TkcpSessionPtr sess = it->second;
+        it->second.reset();
+        sess->GetLoop()->runInLoop(boost::bind(&TkcpSession::ConnectDestroyed, sess));
+        sess.reset();
+    }
 }
+
 void TkcpServer::Start() {
     if (started_.getAndSet(1) == 0) {
         tcpserver_.start();
@@ -41,8 +55,6 @@ void TkcpServer::Start() {
 }
 
 void TkcpServer::newTcpConnection(const TcpConnectionPtr& conn) {
-    LOG_DEBUG << "tcp conn " << "from " << conn->peerAddress().toIpPort()
-              << " " << (conn->connected() ? "UP" : "DOWN");
     if (conn->connected()) {
         uint32_t conv = nextConv_++;
         TkcpSessionPtr sess = TkcpSessionPtr(new TkcpSession(conv, udpListenAddress_, conn));
@@ -67,19 +79,25 @@ int TkcpServer::outPutUdpMessage(const TkcpSessionPtr& sess, const char* buf, si
 }
 
 void TkcpServer::removeTckpSession(const TkcpSessionPtr& sess) {
-
+    loop_->runInLoop(boost::bind(&TkcpServer::removeTckpSessionInLoop, this, sess));
 }
 
 void TkcpServer::removeTckpSessionInLoop(const TkcpSessionPtr& sess) {
+    loop_->assertInLoopThread();
 
+    size_t n = sessions_.erase(sess->conv());
+    (void)n;
+    assert(n == 1);
+    EventLoop* ioLoop = sess->GetLoop();
+    ioLoop->queueInLoop(boost::bind(&TkcpSession::ConnectDestroyed, sess));
 }
 
 void TkcpServer::onUdpMessage(UdpMessagePtr& msg) {
-    LOG_DEBUG << "new udp message from " << msg->intetAddress().toIpPort();
     uint32_t conv = static_cast<uint32_t>(msg->buffer()->peekInt32());
 
     SessionMap::const_iterator iter = sessions_.find(conv);
 
+    assert(iter != sessions_.end());
     if (iter != sessions_.end()) {
         iter->second->InputUdpMessage(msg);
     }

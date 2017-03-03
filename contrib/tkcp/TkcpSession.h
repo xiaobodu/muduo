@@ -9,6 +9,7 @@
 
 #include <muduo/net/TcpConnection.h>
 #include <muduo/base/Timestamp.h>
+#include <muduo/net/TimerId.h>
 
 #include "kcp/ikcp.h"
 #include "TkcpCallback.h"
@@ -33,6 +34,9 @@ namespace net {
             bool Connected() const { return state_ == KConnected; }
             bool Disconnected() const { return state_ == KDisconnected; }
 
+            void Send(const void* message, int len);
+            void Send(const StringPiece& message);
+            void Send(Buffer* message);
 
 
 
@@ -54,14 +58,22 @@ namespace net {
             void SyncUdpConnectionInfo();
             void onTcpConnection(const TcpConnectionPtr& conn);
             void onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp receiveTime);
+            void ConnectDestroyed();
 
         private:
+
+
+            void SendInLoop(const StringPiece& message);
+            void SendInLoop(const void *message, size_t len);
             //for udp begin
             void onConnectSyn();
             void onConnectSyncAck();
             void onConnectAck();
             void onPingRequest();
             void onPingReply();
+            void initKcp();
+            void kcpUpdate();
+            void SendKcpMsg(const void *data, size_t len);
             void onUdpData(const char* buf, size_t len);
             //for udp end
 
@@ -75,7 +87,7 @@ namespace net {
 
         private:
             int handleKcpOutput(const char* buf, int len);
-            static int KcpOutput(const char* buf, int len, struct IKCPCB* kcp, void *user);
+            static int kcpOutput(const char* buf, int len, struct IKCPCB* kcp, void *user);
 
             void setState(StateE s) { state_ = s; }
 
@@ -97,7 +109,7 @@ namespace net {
 
 
             UdpOutputCallback udpOutputCallback_;
-
+            TimerId kcpUpdateTimer;
     };
 
 }
