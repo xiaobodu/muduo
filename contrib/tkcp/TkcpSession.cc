@@ -117,6 +117,9 @@ void TkcpSession::onPingReply() {
 }
 
 void TkcpSession::onUdpData(const char* buf, size_t len) {
+    Buffer message(len);
+    message.append(buf, len);
+    tkcpMessageCallback_(shared_from_this(), &message);
 }
 
 

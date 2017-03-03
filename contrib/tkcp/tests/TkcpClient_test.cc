@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    Logger::setLogLevel(Logger::DEBUG);
+    Logger::setLogLevel(Logger::TRACE);
 
     EventLoop loop;
     InetAddress serverAddr(argv[1], static_cast<uint16_t>(atoi(argv[2])));

@@ -1,6 +1,7 @@
 #include <contrib/tkcp/UdpService.h>
 #include <boost/bind.hpp>
 #include <muduo/base/Logging.h>
+#include <stdio.h>
 
 
 using namespace muduo;
@@ -15,11 +16,15 @@ void stop(UdpService* udpService, EventLoop* loop) {
     loop->quit();
 }
 
-int main(void)
+int main(int argc, char* argv[])
 {
+
+    if (argc < 3) {
+        printf("arg error usage: ip port\n");
+    }
    // Logger::setLogLevel(Logger::TRACE);
     EventLoop loop;
-    InetAddress v4Addr(5000);
+    InetAddress v4Addr(argv[1], static_cast<uint16_t>(atoi(argv[2])));
 
     UdpService udpService(&loop, v4Addr);
 
