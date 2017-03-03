@@ -8,7 +8,6 @@
 using namespace muduo;
 using namespace muduo::net;
 
-
 int main(void)
 {
     Logger::setLogLevel(Logger::DEBUG);

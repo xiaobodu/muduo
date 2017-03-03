@@ -1,4 +1,5 @@
 
+#include <stdio.h>
 
 #include <muduo/net/EventLoop.h>
 #include <muduo/net/InetAddress.h>
@@ -9,11 +10,16 @@ using namespace muduo;
 using namespace muduo::net;
 
 
-int main(void)
+int main(int argc, char* argv[])
 {
+    if (argc < 4) {
+        printf("arg err Usage: ip tcpport udpport\n");
+        return 1;
+    }
+
     Logger::setLogLevel(Logger::DEBUG);
-    InetAddress tcpAddr(5001);
-    InetAddress udpaddr(5000);
+    InetAddress tcpAddr(argv[1], static_cast<uint16_t>(atoi(argv[2])));
+    InetAddress udpaddr(argv[1], static_cast<uint16_t>(atoi(argv[3])));
 
 
     EventLoop loop;

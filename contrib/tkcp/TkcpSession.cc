@@ -101,6 +101,10 @@ void TkcpSession::onConnectSyn() {
 }
 
 void TkcpSession::onConnectSyncAck() {
+    Buffer sendbuf;
+    EncodeUint32(&sendbuf, conv_);
+    EncodeUint8(&sendbuf, packet::udp::kConnectAck);
+    udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
 }
 
 void TkcpSession::onConnectAck() {
@@ -170,6 +174,11 @@ void TkcpSession::onUdpconnectionInfo(Buffer* buf) {
     connInfo.Decode(buf);
     conv_ = connInfo.conv;
     peerAddressForUdp_ = InetAddress(connInfo.ip, connInfo.port);
+
+    Buffer sendbuf(64);
+    EncodeUint32(&sendbuf, conv_);
+    EncodeUint8(&sendbuf, packet::udp::kConnectSyn);
+    udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
 }
 
 

@@ -25,6 +25,7 @@ TkcpClient::TkcpClient(EventLoop* loop,
     : loop_(CHECK_NOTNULL(loop)),
       name_(nameArg),
       serverAddrForTcp_(serverAddrForTcp),
+      udpsocketConnected(false),
       tcpClient_(loop_, serverAddrForTcp, nameArg) {
     tcpClient_.setConnectionCallback(boost::bind(&TkcpClient::newTcpConnection, this, _1));
 }
@@ -32,7 +33,16 @@ TkcpClient::TkcpClient(EventLoop* loop,
 TkcpClient::~TkcpClient() {
 }
 
+void TkcpClient::Connect() {
+    tcpClient_.connect();
+}
+
+void TkcpClient::Disconnect() {
+    tcpClient_.disconnect();
+}
+
 void TkcpClient::newTcpConnection(const TcpConnectionPtr& conn) {
+
     if (conn->connected()) {
         sess_.reset(new TkcpSession(0, InetAddress(), conn));
         conn->setConnectionCallback(boost::bind(&TkcpSession::onTcpConnection, sess_, _1));
@@ -43,6 +53,10 @@ void TkcpClient::newTcpConnection(const TcpConnectionPtr& conn) {
         sess_->SetTkcpCloseCallback(boost::bind(&TkcpClient::removeTckpSession, this, _1));
         sess_->SetUdpOutCallback(boost::bind(&TkcpClient::outPutUdpMessage, this, _1, _2, _3));
     }
+}
+
+void TkcpClient::removeTckpSession(const TkcpSessionPtr& sess) {
+
 }
 
 
@@ -108,7 +122,40 @@ void TkcpClient::handError() {
 
 }
 
+void TkcpClient::connectUdpsocket() {
+    udpsocketConnected = true;
+    udpsocket_.reset(new UdpSocket(UdpSocket::IPV4, true));
+    udpsocket_->ConnectAddress(serverAddrForUdp_);
+    udpChannel_.reset(new Channel(loop_,udpsocket_->sockfd()));
+    udpChannel_->setReadCallback(boost::bind(&TkcpClient::handleRead, this, _1));
+    udpChannel_->setWriteCallback(boost::bind(&TkcpClient::handWrite, this));
+    udpChannel_->setErrorCallback(boost::bind(&TkcpClient::handError, this));
+    udpChannel_->tie(shared_from_this());
+    udpChannel_->enableReading();
+}
 
+//in loop
+int TkcpClient::outPutUdpMessage(const TkcpSessionPtr& sess, const char* buf, size_t len) {
+
+    if (!udpsocketConnected) {
+        serverAddrForUdp_ = sess->peerAddressForUdp();
+        connectUdpsocket();
+    }
+
+    if (udpChannel_->isWriting()) {
+        outputUdMessagesCache_.push(string(buf,len));
+        return 0;
+    }
+
+    int ret = sendUdpMsg(buf, len);
+    if (ret < 0) {
+        outputUdMessagesCache_.push(string(buf,len));
+        udpChannel_->enableWriting();
+        return 0;
+    }
+
+    return 0;
+}
 
 }
 }

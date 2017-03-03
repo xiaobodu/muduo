@@ -19,7 +19,7 @@
 namespace muduo {
 
 namespace net {
-    class UdpSocket : boost::noncopyable {
+    class UdpSocket : public boost::noncopyable {
         public:
             enum  IPVersion {
                 IPV4 = 0,

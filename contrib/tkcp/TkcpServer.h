@@ -24,7 +24,7 @@ namespace muduo {
 namespace net {
 
 
-class TkcpServer : boost::noncopyable {
+class TkcpServer : public boost::noncopyable {
     public:
         TkcpServer(EventLoop* loop,
                    const InetAddress& tcpListenAddr,

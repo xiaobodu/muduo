@@ -7,6 +7,7 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/enable_shared_from_this.hpp>
 
 #include <muduo/base/Types.h>
 #include <muduo/net/EventLoop.h>
@@ -25,7 +26,8 @@ namespace muduo {
 
 namespace net {
 
-class TkcpClient : boost::noncopyable {
+class TkcpClient : public boost::noncopyable,
+                   public boost::enable_shared_from_this<TkcpClient> {
     public:
         TkcpClient(EventLoop* loop,
                    const InetAddress& serverAddrForTcp,
@@ -38,9 +40,7 @@ class TkcpClient : boost::noncopyable {
         EventLoop* getLoop() const { return loop_; }
         const string& name() const { return name_; }
 
-        TkcpSessionPtr Sess() const {
-            return sess_;
-        }
+        TkcpSessionPtr Sess() const { return sess_; }
 
         void SetTkcpConnectionCallback(const TkcpConnectionCallback& cb) {
             tkcpConnectionCallback_ = cb;
@@ -62,6 +62,7 @@ class TkcpClient : boost::noncopyable {
         void handleRead(Timestamp receiveTime);
         void handWrite();
         void handError();
+        void connectUdpsocket();
         int sendUdpMsg(const char* buf, size_t len);
         int outPutUdpMessage(const TkcpSessionPtr& sess, const char* buf, size_t len);
 
@@ -76,6 +77,7 @@ class TkcpClient : boost::noncopyable {
         TkcpConnectionCallback tkcpConnectionCallback_;
         TkcpMessageCallback tkcpMessageCallback_;
 
+        bool udpsocketConnected;
         boost::scoped_ptr<Channel> udpChannel_;
         boost::scoped_ptr<UdpSocket> udpsocket_;
 
