@@ -1,5 +1,6 @@
 
 #include <stddef.h>
+#include <stdio.h>
 #include <assert.h>
 #include <boost/bind.hpp>
 
@@ -57,7 +58,15 @@ void TkcpServer::Start() {
 void TkcpServer::newTcpConnection(const TcpConnectionPtr& conn) {
     if (conn->connected()) {
         uint32_t conv = nextConv_++;
-        TkcpSessionPtr sess = TkcpSessionPtr(new TkcpSession(conv, udpListenAddress_, conn));
+
+        char buf[64];
+        snprintf(buf, sizeof(buf), "-%s-%d:%d", conn->name().c_str(), udpListenAddress_.toPort(),  conv);
+        string sessName = name_ + buf;
+
+        LOG_INFO << "TkcpServer::newTkcpConnection [" << name_
+                 << "] - new sess [" << sessName
+                 << "]";
+        TkcpSessionPtr sess = TkcpSessionPtr(new TkcpSession(conv, udpListenAddress_, conn, sessName));
         conn->setConnectionCallback(boost::bind(&TkcpSession::onTcpConnection, sess, _1));
         conn->setMessageCallback(boost::bind(&TkcpSession::onTcpMessage, sess, _1, _2, _3));
 
@@ -88,6 +97,7 @@ void TkcpServer::removeTckpSessionInLoop(const TkcpSessionPtr& sess) {
     size_t n = sessions_.erase(sess->conv());
     (void)n;
     assert(n == 1);
+    LOG_DEBUG << sess->name() << " count " << sess.use_count();
     EventLoop* ioLoop = sess->GetLoop();
     ioLoop->queueInLoop(boost::bind(&TkcpSession::ConnectDestroyed, sess));
 }

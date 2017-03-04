@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    Logger::setLogLevel(Logger::DEBUG);
+    Logger::setLogLevel(Logger::INFO);
     InetAddress tcpAddr(argv[1], static_cast<uint16_t>(atoi(argv[2])));
     InetAddress udpaddr(argv[1], static_cast<uint16_t>(atoi(argv[3])));
 

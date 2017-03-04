@@ -51,6 +51,10 @@ string  PacketIdToString(uint8_t packetId) {
             return "kUdpConnectionInfo";
         case kData:
             return "kData";
+        case kPingRequest:
+            return "KPingRequest";
+        case kPingReply:
+            return "kPingReply";
         default:
             {
                 char buf[64] = {0};

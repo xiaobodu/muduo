@@ -26,8 +26,7 @@ namespace muduo {
 
 namespace net {
 
-class TkcpClient : public boost::noncopyable,
-                   public boost::enable_shared_from_this<TkcpClient> {
+class TkcpClient : public boost::noncopyable {
     public:
         TkcpClient(EventLoop* loop,
                    const InetAddress& serverAddrForTcp,
@@ -87,6 +86,9 @@ class TkcpClient : public boost::noncopyable,
         typedef std::queue<string> stringqueue;
         stringqueue outputUdMessagesCache_;
 };
+
+
+typedef boost::shared_ptr<TkcpClient> TkcpClientPtr;
 }
 
 }

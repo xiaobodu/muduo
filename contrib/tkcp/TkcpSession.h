@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <boost/noncopyable.hpp>
 #include <boost/enable_shared_from_this.hpp>
+#include <boost/any.hpp>
 
 
 #include <muduo/net/TcpConnection.h>
@@ -27,7 +28,8 @@ namespace net {
         public:
             TkcpSession(uint32_t conv,
                         const InetAddress& localAddressForUdp,
-                        const TcpConnectionPtr& tcpConnectionPtr);
+                        const TcpConnectionPtr& tcpConnectionPtr,
+                        const string& nameArg);
             ~TkcpSession();
 
             EventLoop* GetLoop() const { return loop_; }
@@ -46,6 +48,10 @@ namespace net {
             void SetTkcpMessageCallback(const TkcpMessageCallback& cb) { tkcpMessageCallback_ = cb ; }
 
             uint32_t conv() const { return conv_; };
+            const string name() const { return name_; }
+            void SetContext(const boost::any& context) { context_ = context; }
+            const boost::any& GetContext() const { return context_; }
+            boost::any* GetMutableContext() { return &context_; }
 
 
             const InetAddress& localAddressForTcp() { return tcpConnectionPtr_->localAddress(); }
@@ -75,15 +81,21 @@ namespace net {
             void kcpUpdate();
             void SendKcpMsg(const void *data, size_t len);
             void onUdpData(const char* buf, size_t len);
+
+            void udpPingRequest();
             //for udp end
 
             //for tcp begin
             void onUdpconnectionInfo(Buffer* buf);
             void onTcpData(Buffer* buf);
+            void tcpPingRequest();
+            void onTcpPingRequest(Buffer* buf);
+            void onTcpPingReply(Buffer* buf);
             //for tcp end
 
         private:
             enum StateE { KDisconnected, KConnecting, KConnected, kDisconnecting };
+            const char* stateToString() const;
 
         private:
             int handleKcpOutput(const char* buf, int len);
@@ -94,6 +106,7 @@ namespace net {
         private:
             EventLoop* loop_;
             uint32_t conv_;
+            string name_;
 
             TcpConnectionPtr tcpConnectionPtr_;
             StateE state_;
@@ -110,7 +123,19 @@ namespace net {
 
             UdpOutputCallback udpOutputCallback_;
             TimerId kcpUpdateTimer;
+            TimerId udpPingTimer;
+
+            TimerId tcpPingTimer;
+
+            Timestamp lastRecvTcpPingDataTime;
+            Timestamp lastRecvUdpPingDataTime;
+
+
+            boost::any context_;
     };
+
+
+    typedef boost::shared_ptr<TkcpSession> TkcpSessionPtr;
 
 }
 

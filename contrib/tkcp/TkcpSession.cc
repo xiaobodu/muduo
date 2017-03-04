@@ -47,19 +47,43 @@ void defaultTkcpMessageCallback(const TkcpSessionPtr&, Buffer* buf) {
     buf->retrieveAll();
 }
 
-TkcpSession::TkcpSession(uint32_t conv, const InetAddress& localAddressForUdp, const TcpConnectionPtr& tcpConnectionPtr)
+TkcpSession::TkcpSession(uint32_t conv,
+        const InetAddress& localAddressForUdp,
+        const TcpConnectionPtr& tcpConnectionPtr,
+        const string& nameArg)
     : loop_(tcpConnectionPtr->getLoop()),
       conv_(conv),
+      name_(nameArg),
       tcpConnectionPtr_(tcpConnectionPtr),
       state_(KConnecting),
       localAddressForUdp_(localAddressForUdp),
       kcpcb_(NULL) {
 
+    LOG_DEBUG << "TkcpSession::ctor[" << name_ << "] at" << this;
 
 }
 
 TkcpSession::~TkcpSession() {
     assert(kcpcb_ == NULL);
+
+    LOG_DEBUG << "TkcpSession::dtor[" << name_ << "] at" << this
+              << " state=" << stateToString();
+    assert(state_ == KDisconnected);
+}
+
+const char* TkcpSession::stateToString() const {
+    switch(state_) {
+        case KDisconnected:
+            return "KDisconnected";
+        case KConnecting:
+            return "KConnecting";
+        case KConnected:
+            return "KConnected";
+        case kDisconnecting:
+            return "KDisconnected";
+        default:
+            return "unknown state";
+    }
 }
 
 void TkcpSession::Send(const void* data, int len) {
@@ -106,7 +130,6 @@ void TkcpSession::SendInLoop(const void *data, size_t len) {
 }
 
 void TkcpSession::SendKcpMsg(const void *data, size_t len) {
-
     ikcp_send(kcpcb_, static_cast<const char*>(data), static_cast<int>(len));
 }
 
@@ -162,7 +185,7 @@ void TkcpSession::InputUdpMessage(UdpMessagePtr& msg) {
 }
 
 void TkcpSession::onConnectSyn() {
-    Buffer sendbuf;
+    Buffer sendbuf(8);
     EncodeUint32(&sendbuf, conv_);
     EncodeUint8(&sendbuf, packet::udp::kConnectSynAck);
 
@@ -170,11 +193,15 @@ void TkcpSession::onConnectSyn() {
 }
 
 void TkcpSession::onConnectSyncAck() {
-    Buffer sendbuf;
+    initKcp(); // client
+    udpPingTimer = loop_->runEvery(60, boost::bind(&TkcpSession::udpPingRequest, this));
+    tcpPingTimer = loop_->runAfter(120, boost::bind(&TkcpSession::tcpPingRequest, this));
+
+    Buffer sendbuf(8);
     EncodeUint32(&sendbuf, conv_);
     EncodeUint8(&sendbuf, packet::udp::kConnectAck);
     udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
-    initKcp(); // client
+
 }
 
 void TkcpSession::onConnectAck() {
@@ -186,7 +213,7 @@ void TkcpSession::kcpUpdate() {
     ikcp_update(kcpcb_, now);
     uint32_t  nextTime = ikcp_check(kcpcb_, now);
 
-    loop_->runAfter(MillisecondToSecond(nextTime),
+    kcpUpdateTimer = loop_->runAfter(MillisecondToSecond(nextTime),
                     boost::bind(&TkcpSession::kcpUpdate, this));
 }
 
@@ -200,7 +227,7 @@ void TkcpSession::initKcp() {
     ikcp_setmtu(kcpcb_, 576 - 64 - packet::udp::kPacketHeadLength);
     kcpcb_->rx_minrto = 10;
 
-    loop_->runAfter(MillisecondToSecond(kcpcb_->interval),
+    kcpUpdateTimer = loop_->runAfter(MillisecondToSecond(kcpcb_->interval),
                     boost::bind(&TkcpSession::kcpUpdate, this));
 
     setState(KConnected);
@@ -208,9 +235,22 @@ void TkcpSession::initKcp() {
 }
 
 void TkcpSession::onPingRequest() {
+    lastRecvUdpPingDataTime = Timestamp::now();
+    Buffer sendbuf(8);
+    EncodeUint32(&sendbuf, conv_);
+    EncodeUint8(&sendbuf, packet::udp::kPingReply);
+    udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
 }
 
 void TkcpSession::onPingReply() {
+    lastRecvUdpPingDataTime = Timestamp::now();
+}
+
+void TkcpSession::udpPingRequest() {
+    Buffer sendbuf(8);
+    EncodeUint32(&sendbuf, conv_);
+    EncodeUint8(&sendbuf, packet::udp::kPingRequest);
+    udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
 }
 
 void TkcpSession::onUdpData(const char* buf, size_t len) {
@@ -243,32 +283,50 @@ void TkcpSession::SyncUdpConnectionInfo() {
 
 void TkcpSession::onTcpConnection(const TcpConnectionPtr& conn) {
     loop_->assertInLoopThread();
-    LOG_DEBUG << "tcp conn " << "from " << conn->peerAddress().toIpPort()
-        << " " << (conn->connected() ? "UP" : "DOWN");
+    assert(conn->disconnected());
+    if (conn->disconnected()) {
+
+        assert(state_ == KConnected || state_ == kDisconnecting);
+        setState(KDisconnected);
+
+        loop_->cancel(udpPingTimer);
+        loop_->cancel(tcpPingTimer);
+        loop_->cancel(kcpUpdateTimer);
+
+        TkcpSessionPtr guardThis(shared_from_this());
+        tkcpConnectionCallback_(guardThis);
+
+
+        tkcpCloseCallback_(guardThis);
+    }
+
 }
 
 
 void TkcpSession::onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp receiveTime) {
     loop_->assertInLoopThread();
-    while (buf->readableBytes() > packet::tcp::kPacketHeadLength) {
-
+    while (buf->readableBytes() >= packet::tcp::kPacketHeadLength) {
         Buffer headBuf;
         headBuf.append(buf->peek(), packet::tcp::kPacketHeadLength);
         uint16_t len = DecodeUint16(&headBuf);
 
         if (buf->readableBytes() >= implicit_cast<std::size_t>(len)) {
             uint8_t packeId = DecodeUint8(&headBuf);
+            LOG_DEBUG << "recv tcp message " << packet::tcp::PacketIdToString(packeId)
+                      << "from " << " conv " << conv_;
             switch(packeId) {
                 case packet::tcp::kData:
-                    {
-                        onTcpData(buf);
-                        break;
-                    }
+                    onTcpData(buf);
+                    break;
                 case packet::tcp::kUdpConnectionInfo:
-                    {
-                        onUdpconnectionInfo(buf);
-                        break;
-                    }
+                    onUdpconnectionInfo(buf);
+                    break;
+                case packet::tcp::kPingRequest:
+                    onTcpPingRequest(buf);
+                    break;
+                case packet::tcp::kPingReply:
+                    onTcpPingReply(buf);
+                    break;
                 default:
                     LOG_WARN << "unknown tcp message";
             }
@@ -284,13 +342,34 @@ void TkcpSession::onUdpconnectionInfo(Buffer* buf) {
     conv_ = connInfo.conv;
     peerAddressForUdp_ = InetAddress(connInfo.ip, connInfo.port);
 
-    Buffer sendbuf(64);
+    Buffer sendbuf(8);
     EncodeUint32(&sendbuf, conv_);
     EncodeUint8(&sendbuf, packet::udp::kConnectSyn);
     udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
 }
 
+void TkcpSession::tcpPingRequest() {
+    Buffer sendbuf(8);
+    EncodeUint16(&sendbuf, static_cast<uint16_t>(packet::tcp::kPacketHeadLength));
+    EncodeUint8(&sendbuf, packet::tcp::kPingRequest);
+    tcpConnectionPtr_->send(&sendbuf);
+}
 
+void TkcpSession::onTcpPingRequest(Buffer* buf) {
+    buf->retrieve(packet::tcp::kPacketHeadLength);
+    lastRecvTcpPingDataTime = Timestamp::now();
+
+    Buffer sendbuf(8);
+
+    EncodeUint16(&sendbuf, static_cast<uint16_t>(packet::tcp::kPacketHeadLength));
+    EncodeUint8(&sendbuf, packet::tcp::kPingReply);
+    tcpConnectionPtr_->send(&sendbuf);
+}
+
+void TkcpSession::onTcpPingReply(Buffer *buf) {
+    buf->retrieve(packet::tcp::kPacketHeadLength);
+    lastRecvTcpPingDataTime = Timestamp::now();
+}
 
 void TkcpSession::onTcpData(Buffer* buf) {
     uint16_t len = DecodeUint16(buf);
@@ -305,10 +384,15 @@ void TkcpSession::onTcpData(Buffer* buf) {
 void TkcpSession::ConnectDestroyed() {
     loop_->assertInLoopThread();
     if (state_ == KConnected) {
+
+        loop_->cancel(udpPingTimer);
+        loop_->cancel(tcpPingTimer);
+        loop_->cancel(kcpUpdateTimer);
+
         setState(KDisconnected);
         tkcpConnectionCallback_(shared_from_this());
     }
-    loop_->cancel(kcpUpdateTimer);
+    tcpConnectionPtr_.reset();
     ikcp_release(kcpcb_);
     kcpcb_ = NULL;
 }

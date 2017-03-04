@@ -31,6 +31,8 @@ struct TcpPacketHead {
 enum TcpPacketId {
     kUdpConnectionInfo = 1,
     kData = 2,
+    kPingRequest = 3,
+    kPingReply = 4,
 };
 
 

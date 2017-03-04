@@ -44,7 +44,7 @@ void TkcpClient::Disconnect() {
 void TkcpClient::newTcpConnection(const TcpConnectionPtr& conn) {
 
     if (conn->connected()) {
-        sess_.reset(new TkcpSession(0, InetAddress(), conn));
+        sess_.reset(new TkcpSession(0, InetAddress(), conn, name_+":client"));
         conn->setConnectionCallback(boost::bind(&TkcpSession::onTcpConnection, sess_, _1));
         conn->setMessageCallback(boost::bind(&TkcpSession::onTcpMessage, sess_, _1, _2, _3));
 
@@ -130,7 +130,6 @@ void TkcpClient::connectUdpsocket() {
     udpChannel_->setReadCallback(boost::bind(&TkcpClient::handleRead, this, _1));
     udpChannel_->setWriteCallback(boost::bind(&TkcpClient::handWrite, this));
     udpChannel_->setErrorCallback(boost::bind(&TkcpClient::handError, this));
-    udpChannel_->tie(shared_from_this());
     udpChannel_->enableReading();
 }
 

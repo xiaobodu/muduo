@@ -170,7 +170,7 @@ void UdpService::SendMsg(const UdpMessagePtr& msg) {
 
 void UdpService::messagePerSecond() {
     Timestamp now = Timestamp::now();
-    LOG_INFO << static_cast<double>(count_)/(muduo::timeDifference(now, time_)) <<  " message persecond";
+//    LOG_INFO << static_cast<double>(count_)/(muduo::timeDifference(now, time_)) <<  " message persecond";
     time_ = now;
     count_ = 0;
 }
