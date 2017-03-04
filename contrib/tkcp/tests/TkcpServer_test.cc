@@ -5,6 +5,8 @@
 #include <muduo/net/InetAddress.h>
 #include <muduo/base/Logging.h>
 #include <contrib/tkcp/TkcpServer.h>
+#include <gperftools/profiler.h>
+#include <boost/bind.hpp>
 
 using namespace muduo;
 using namespace muduo::net;
@@ -17,6 +19,10 @@ void OnMessage(const TkcpSessionPtr& sess, Buffer* buffer) {
     sess->Send(buffer);
 }
 
+void Stop(EventLoop* loop) {
+    loop->quit();
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -24,7 +30,7 @@ int main(int argc, char* argv[])
         printf("arg err Usage: ip tcpport udpport\n");
         return 1;
     }
-
+    ProfilerStart("Test");
     Logger::setLogLevel(Logger::INFO);
     InetAddress tcpAddr(argv[1], static_cast<uint16_t>(atoi(argv[2])));
     InetAddress udpaddr(argv[1], static_cast<uint16_t>(atoi(argv[3])));
@@ -36,10 +42,12 @@ int main(int argc, char* argv[])
     server.SetTkcpConnectionCallback(OnConnection);
     server.SetTkcpMessageCallback(OnMessage);
 
+    loop.runAfter(120, boost::bind(Stop, &loop));
+
     server.Start();
 
     loop.loop();
 
-
+    ProfilerStop();
     return 0;
 }

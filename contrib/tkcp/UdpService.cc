@@ -8,6 +8,7 @@
 #include <muduo/base/Logging.h>
 #include <muduo/net/Buffer.h>
 #include <muduo/net/SocketsOps.h>
+#include <gperftools/profiler.h>
 #include "UdpService.h"
 
 
@@ -87,6 +88,7 @@ void UdpService::stopInLoop() {
 }
 
 void UdpService::runInUdpMsgRecvThread() {
+    ProfilerRegisterThread();
     while (running_) {
          const size_t initialSize = 1472;
          struct sockaddr fromAddr;
@@ -124,6 +126,7 @@ void UdpService::messageInloop(UdpMessagePtr msg) {
 }
 
 void UdpService::runInUdpMsgSendThread() {
+    ProfilerRegisterThread();
     while(running_) {
         UdpMessagePtr message;
 
