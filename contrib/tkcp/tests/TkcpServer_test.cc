@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
         printf("arg err Usage: ip tcpport udpport\n");
         return 1;
     }
-    ProfilerStart("Test");
+    //ProfilerStart("Test");
     Logger::setLogLevel(Logger::INFO);
     InetAddress tcpAddr(argv[1], static_cast<uint16_t>(atoi(argv[2])));
     InetAddress udpaddr(argv[1], static_cast<uint16_t>(atoi(argv[3])));
@@ -42,12 +42,12 @@ int main(int argc, char* argv[])
     server.SetTkcpConnectionCallback(OnConnection);
     server.SetTkcpMessageCallback(OnMessage);
 
-    loop.runAfter(120, boost::bind(Stop, &loop));
+    loop.runAfter(600, boost::bind(Stop, &loop));
 
     server.Start();
 
     loop.loop();
 
-    ProfilerStop();
+    //ProfilerStop();
     return 0;
 }

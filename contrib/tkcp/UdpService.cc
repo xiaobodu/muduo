@@ -88,7 +88,7 @@ void UdpService::stopInLoop() {
 }
 
 void UdpService::runInUdpMsgRecvThread() {
-    ProfilerRegisterThread();
+   // ProfilerRegisterThread();
     while (running_) {
          const size_t initialSize = 1472;
          struct sockaddr fromAddr;
@@ -126,7 +126,7 @@ void UdpService::messageInloop(UdpMessagePtr msg) {
 }
 
 void UdpService::runInUdpMsgSendThread() {
-    ProfilerRegisterThread();
+   // ProfilerRegisterThread();
     while(running_) {
         UdpMessagePtr message;
 

@@ -211,10 +211,6 @@ void TkcpSession::onConnectAck() {
 void TkcpSession::kcpUpdate() {
     uint32_t now =  Clock();
     ikcp_update(kcpcb_, now);
-    uint32_t  nextTime = ikcp_check(kcpcb_, now);
-
-    kcpUpdateTimer = loop_->runAfter(MillisecondToSecond(nextTime),
-                    boost::bind(&TkcpSession::kcpUpdate, this));
 }
 
 
@@ -227,7 +223,8 @@ void TkcpSession::initKcp() {
     ikcp_setmtu(kcpcb_, 576 - 64 - packet::udp::kPacketHeadLength);
     kcpcb_->rx_minrto = 10;
 
-    kcpUpdateTimer = loop_->runAfter(MillisecondToSecond(kcpcb_->interval),
+    LOG_INFO << "interval " << kcpcb_->interval;
+    kcpUpdateTimer = loop_->runEvery(MillisecondToSecond(kcpcb_->interval),
                     boost::bind(&TkcpSession::kcpUpdate, this));
 
     setState(KConnected);

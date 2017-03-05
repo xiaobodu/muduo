@@ -12,6 +12,7 @@
 #include <muduo/net/EventLoop.h>
 #include <muduo/net/InetAddress.h>
 #include <muduo/net/TcpServer.h>
+#include <boost/unordered_map.hpp>
 
 #include "TkcpSession.h"
 #include "TkcpCallback.h"
@@ -59,7 +60,7 @@ class TkcpServer : public boost::noncopyable {
 
     private:
 
-    typedef std::map<uint32_t, TkcpSessionPtr> SessionMap;
+    typedef boost::unordered_map<uint32_t, TkcpSessionPtr> SessionMap;
     EventLoop* loop_;
     const InetAddress tcpListenAddress_;
     const InetAddress udpListenAddress_;
