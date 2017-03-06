@@ -86,11 +86,12 @@ void runClient(const char* ip, uint16_t port) {
 
 int main(int argc, char* argv[]) {
     if (argc > 2) {
-        uint16_t port = static_cast<uint16_t>(atoi(argv[2]));
 
         if (strcmp(argv[1], "-s") == 0) {
+            uint16_t port = static_cast<uint16_t>(atoi(argv[3]));
             runServer(argv[2], port);
         } else {
+            uint16_t port = static_cast<uint16_t>(atoi(argv[2]));
             runClient(argv[1], port);
         }
     } else {
