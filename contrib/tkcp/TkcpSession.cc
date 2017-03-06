@@ -129,6 +129,7 @@ void TkcpSession::SendInLoop(const void *data, size_t len) {
 
 void TkcpSession::SendKcpMsg(const void *data, size_t len) {
     ikcp_send(kcpcb_, static_cast<const char*>(data), static_cast<int>(len));
+    ikcp_flush(kcpcb_);
 }
 
 
@@ -261,6 +262,7 @@ void TkcpSession::onUdpData(const char* buf, size_t len) {
         message.hasWritten(nr);
         tkcpMessageCallback_(shared_from_this(), &message);
     }
+    ikcp_flush(kcpcb_);
 }
 
 
