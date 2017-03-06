@@ -122,13 +122,15 @@ namespace net {
 
 
             UdpOutputCallback udpOutputCallback_;
-            TimerId kcpUpdateTimer;
-            TimerId udpPingTimer;
 
-            TimerId tcpPingTimer;
+            TimerId kcpUpdateTimer_;
+            uint32_t nextKcpUpdateTime_;
+            TimerId udpPingTimer_;
 
-            Timestamp lastRecvTcpPingDataTime;
-            Timestamp lastRecvUdpPingDataTime;
+            TimerId tcpPingTimer_;
+
+            Timestamp lastRecvTcpPingDataTime_;
+            Timestamp lastRecvUdpPingDataTime_;
 
 
             boost::any context_;

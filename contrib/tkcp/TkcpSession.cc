@@ -19,18 +19,15 @@ namespace net {
 
 
 
-const int KMicroSecondsPerMillissecond = 1000;
+const int kMicroSecondsPerMillissecond = 1000;
 const int kMillissecondsPerSecond = 1000;
 static double MillisecondToSecond(int millisecond) {
     return static_cast<double>(millisecond) / kMillissecondsPerSecond;
 }
 
-static uint32_t Clock() {
-    struct timeval tv;
-    ::gettimeofday(&tv, NULL);
-    uint64_t millisecond = static_cast<uint64_t>(tv.tv_sec) * kMillissecondsPerSecond+
-                           (tv.tv_usec / KMicroSecondsPerMillissecond);
 
+static uint32_t TimestampToMillisecond(const Timestamp time) {
+    uint64_t millisecond = static_cast<uint64_t>(time.microSecondsSinceEpoch()/kMicroSecondsPerMillissecond);
     return static_cast<uint32_t>(millisecond & 0xfffffffful);
 }
 
@@ -57,7 +54,8 @@ TkcpSession::TkcpSession(uint32_t conv,
       tcpConnectionPtr_(tcpConnectionPtr),
       state_(KConnecting),
       localAddressForUdp_(localAddressForUdp),
-      kcpcb_(NULL) {
+      kcpcb_(NULL),
+      nextKcpUpdateTime_(0) {
 
     LOG_DEBUG << "TkcpSession::ctor[" << name_ << "] at" << this;
 
@@ -194,8 +192,8 @@ void TkcpSession::onConnectSyn() {
 
 void TkcpSession::onConnectSyncAck() {
     initKcp(); // client
-    udpPingTimer = loop_->runEvery(60, boost::bind(&TkcpSession::udpPingRequest, this));
-    tcpPingTimer = loop_->runAfter(120, boost::bind(&TkcpSession::tcpPingRequest, this));
+    udpPingTimer_ = loop_->runEvery(60, boost::bind(&TkcpSession::udpPingRequest, this));
+    tcpPingTimer_ = loop_->runAfter(120, boost::bind(&TkcpSession::tcpPingRequest, this));
 
     Buffer sendbuf(8);
     EncodeUint32(&sendbuf, conv_);
@@ -209,8 +207,11 @@ void TkcpSession::onConnectAck() {
 }
 
 void TkcpSession::kcpUpdate() {
-    uint32_t now =  Clock();
-    ikcp_update(kcpcb_, now);
+    uint32_t now =  TimestampToMillisecond(loop_->pollReturnTime());
+    if (now > nextKcpUpdateTime_) {
+        ikcp_update(kcpcb_, now);
+        nextKcpUpdateTime_ = ikcp_check(kcpcb_, now);
+    }
 }
 
 
@@ -223,8 +224,7 @@ void TkcpSession::initKcp() {
     ikcp_setmtu(kcpcb_, 576 - 64 - packet::udp::kPacketHeadLength);
     kcpcb_->rx_minrto = 10;
 
-    LOG_INFO << "interval " << kcpcb_->interval;
-    kcpUpdateTimer = loop_->runEvery(MillisecondToSecond(kcpcb_->interval),
+    kcpUpdateTimer_ = loop_->runEvery(MillisecondToSecond(kcpcb_->interval),
                     boost::bind(&TkcpSession::kcpUpdate, this));
 
     setState(KConnected);
@@ -232,7 +232,7 @@ void TkcpSession::initKcp() {
 }
 
 void TkcpSession::onPingRequest() {
-    lastRecvUdpPingDataTime = Timestamp::now();
+    lastRecvUdpPingDataTime_ = loop_->pollReturnTime();
     Buffer sendbuf(8);
     EncodeUint32(&sendbuf, conv_);
     EncodeUint8(&sendbuf, packet::udp::kPingReply);
@@ -240,7 +240,7 @@ void TkcpSession::onPingRequest() {
 }
 
 void TkcpSession::onPingReply() {
-    lastRecvUdpPingDataTime = Timestamp::now();
+    lastRecvUdpPingDataTime_ = loop_->pollReturnTime();
 }
 
 void TkcpSession::udpPingRequest() {
@@ -286,9 +286,9 @@ void TkcpSession::onTcpConnection(const TcpConnectionPtr& conn) {
         assert(state_ == KConnected || state_ == kDisconnecting);
         setState(KDisconnected);
 
-        loop_->cancel(udpPingTimer);
-        loop_->cancel(tcpPingTimer);
-        loop_->cancel(kcpUpdateTimer);
+        loop_->cancel(udpPingTimer_);
+        loop_->cancel(tcpPingTimer_);
+        loop_->cancel(kcpUpdateTimer_);
 
         TkcpSessionPtr guardThis(shared_from_this());
         tkcpConnectionCallback_(guardThis);
@@ -354,7 +354,7 @@ void TkcpSession::tcpPingRequest() {
 
 void TkcpSession::onTcpPingRequest(Buffer* buf) {
     buf->retrieve(packet::tcp::kPacketHeadLength);
-    lastRecvTcpPingDataTime = Timestamp::now();
+    lastRecvTcpPingDataTime_ = loop_->pollReturnTime();
 
     Buffer sendbuf(8);
 
@@ -365,7 +365,7 @@ void TkcpSession::onTcpPingRequest(Buffer* buf) {
 
 void TkcpSession::onTcpPingReply(Buffer *buf) {
     buf->retrieve(packet::tcp::kPacketHeadLength);
-    lastRecvTcpPingDataTime = Timestamp::now();
+    lastRecvTcpPingDataTime_ = loop_->pollReturnTime();
 }
 
 void TkcpSession::onTcpData(Buffer* buf) {
@@ -382,9 +382,9 @@ void TkcpSession::ConnectDestroyed() {
     loop_->assertInLoopThread();
     if (state_ == KConnected) {
 
-        loop_->cancel(udpPingTimer);
-        loop_->cancel(tcpPingTimer);
-        loop_->cancel(kcpUpdateTimer);
+        loop_->cancel(udpPingTimer_);
+        loop_->cancel(tcpPingTimer_);
+        loop_->cancel(kcpUpdateTimer_);
 
         setState(KDisconnected);
         tkcpConnectionCallback_(shared_from_this());
