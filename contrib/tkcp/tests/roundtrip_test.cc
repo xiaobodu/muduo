@@ -28,9 +28,9 @@ void ServerMessageCallback(const TkcpSessionPtr& sess,
 }
 
 
-void runServer(uint16_t port) {
+void runServer(const char* ip, uint16_t port) {
     EventLoop loop;
-    TkcpServer server(&loop, InetAddress(port), InetAddress(static_cast<uint16_t>(port+1)), "clockSever");
+    TkcpServer server(&loop, InetAddress(ip, port), InetAddress(ip, static_cast<uint16_t>(port+1)), "clockSever");
     server.SetTkcpMessageCallback(ServerMessageCallback);
     server.Start();
     loop.loop();
@@ -89,13 +89,13 @@ int main(int argc, char* argv[]) {
         uint16_t port = static_cast<uint16_t>(atoi(argv[2]));
 
         if (strcmp(argv[1], "-s") == 0) {
-            runServer(port);
+            runServer(argv[2], port);
         } else {
             runClient(argv[1], port);
         }
     } else {
 
-        printf("Usage:\n%s -s port\n%s ip port\n", argv[0], argv[0]);
+        printf("Usage:\n%s -s ip port\n%s ip port\n", argv[0], argv[0]);
     }
 }
 
