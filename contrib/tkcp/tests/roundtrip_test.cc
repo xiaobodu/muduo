@@ -48,7 +48,8 @@ void ClientSessionCallback(const TkcpSessionPtr& sess) {
 }
 
 
-
+int64_t total = 0;
+int64_t count = 0;
 void ClientMessageCallback(const TkcpSessionPtr&,
                            Buffer* buffer) {
     int64_t message[2];
@@ -61,6 +62,11 @@ void ClientMessageCallback(const TkcpSessionPtr&,
 
     LOG_INFO << "round trip " << back - send
              << " clock error " << their - mine;
+    total += back - send;
+    ++count;
+
+    LOG_INFO << "avg round trip " << total / count;
+
 }
 
 

@@ -66,6 +66,9 @@ void clientConnectionCallback(const TcpConnectionPtr& conn)
   }
 }
 
+int64_t total = 0;
+int64_t count = 0;
+
 void clientMessageCallback(const TcpConnectionPtr&,
                            Buffer* buffer,
                            muduo::Timestamp receiveTime)
@@ -81,6 +84,10 @@ void clientMessageCallback(const TcpConnectionPtr&,
     int64_t mine = (back+send)/2;
     LOG_INFO << "round trip " << back - send
              << " clock error " << their - mine;
+
+    total += back - send;
+    ++count;
+    LOG_INFO << "avg round trip " << total / count;
   }
 }
 

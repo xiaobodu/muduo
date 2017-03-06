@@ -220,12 +220,12 @@ void TkcpSession::initKcp() {
     assert(kcpcb_ == NULL);
     kcpcb_  = ikcp_create(conv_, this);
     ikcp_setoutput(kcpcb_, kcpOutput);
-    ikcp_nodelay(kcpcb_, 1, 10, 2, 1);
+    ikcp_nodelay(kcpcb_, 1, 30, 2, 1);
     ikcp_wndsize(kcpcb_, 128, 128);
     ikcp_setmtu(kcpcb_, 576 - 64 - packet::udp::kPacketHeadLength);
     kcpcb_->rx_minrto = 10;
 
-    kcpUpdateTimer_ = loop_->runEvery(MillisecondToSecond(kcpcb_->interval),
+    kcpUpdateTimer_ = loop_->runEvery(MillisecondToSecond(30),
                     boost::bind(&TkcpSession::kcpUpdate, this));
 
     setState(KConnected);
