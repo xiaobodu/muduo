@@ -31,8 +31,9 @@ struct TcpPacketHead {
 enum TcpPacketId {
     kUdpConnectionInfo = 1,
     kData = 2,
-    kPingRequest = 3,
-    kPingReply = 4,
+    KUseTcp = 3,
+    kPingRequest = 4,
+    kPingReply = 5,
 };
 
 
@@ -61,10 +62,9 @@ struct UdpPacketHead {
 enum UdpPacketId {
     kConnectSyn = 100,
     kConnectSynAck = 101,
-    kConnectAck    = 102,
-    kPingRequest   = 103,
-    kPingReply     = 104,
-    kData          = 105,
+    kPingRequest   = 102,
+    kPingReply     = 103,
+    kData          = 104,
 };
 
 string PacketIdToString(uint8_t packetId);

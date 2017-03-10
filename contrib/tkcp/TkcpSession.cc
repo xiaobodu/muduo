@@ -52,9 +52,11 @@ TkcpSession::TkcpSession(uint32_t conv,
       conv_(conv),
       name_(nameArg),
       tcpConnectionPtr_(tcpConnectionPtr),
-      state_(KConnecting),
+      state_(kTcpConnected),
       localAddressForUdp_(localAddressForUdp),
+      kcpInited_(false),
       kcpcb_(NULL),
+      trySendConnectSyncTimes(0),
       nextKcpUpdateTime_(0) {
 
     LOG_DEBUG << "TkcpSession::ctor[" << name_ << "] at" << this;
@@ -66,19 +68,22 @@ TkcpSession::~TkcpSession() {
 
     LOG_DEBUG << "TkcpSession::dtor[" << name_ << "] at" << this
               << " state=" << stateToString();
-    assert(state_ == KDisconnected);
+    assert(kcpcb_ == NULL);
+    assert(state_ == kDisconnected);
 }
 
 const char* TkcpSession::stateToString() const {
     switch(state_) {
-        case KDisconnected:
-            return "KDisconnected";
-        case KConnecting:
-            return "KConnecting";
-        case KConnected:
+        case kTcpConnected:
+            return "kTcpConnected";
+        case kUdpConnectSynSend:
+            return "kUdpConnectSynSend";
+        case kConnected:
             return "KConnected";
         case kDisconnecting:
-            return "KDisconnected";
+            return "kDisconnecting";
+        case kDisconnected:
+            return "kDisconnected";
         default:
             return "unknown state";
     }
@@ -89,7 +94,7 @@ void TkcpSession::Send(const void* data, int len) {
 }
 
 void TkcpSession::Send(const StringPiece& message) {
-    if (state_ == KConnected) {
+    if (state_ == kConnected) {
         if (loop_->isInLoopThread()) {
             SendInLoop(message);
         } else {
@@ -101,7 +106,7 @@ void TkcpSession::Send(const StringPiece& message) {
 }
 
 void TkcpSession::Send(Buffer* buf) {
-    if (state_ == KConnected) {
+    if (state_ == kConnected) {
         if (loop_->isInLoopThread()) {
             SendInLoop(buf->peek(), buf->readableBytes());
             buf->retrieveAll();
@@ -119,15 +124,15 @@ void TkcpSession::SendInLoop(const StringPiece& message) {
 
 void TkcpSession::SendInLoop(const void *data, size_t len) {
     loop_->assertInLoopThread();
-    if (state_ == KDisconnected) {
+    if (state_ != kConnected) {
         LOG_WARN << "Disconnected, give up writing";
         return;
     }
 
-    SendKcpMsg(data, len);
+    sendKcpMsg(data, len);
 }
 
-void TkcpSession::SendKcpMsg(const void *data, size_t len) {
+void TkcpSession::sendKcpMsg(const void *data, size_t len) {
     ikcp_send(kcpcb_, static_cast<const char*>(data), static_cast<int>(len));
     ikcp_flush(kcpcb_);
 }
@@ -169,9 +174,6 @@ void TkcpSession::InputUdpMessage(UdpMessagePtr& msg) {
         case packet::udp::kConnectSynAck:
             onConnectSyncAck();
             break;
-        case packet::udp::kConnectAck:
-            onConnectAck();
-            break;
         case packet::udp::kPingRequest:
             onPingRequest();
             break;
@@ -184,6 +186,9 @@ void TkcpSession::InputUdpMessage(UdpMessagePtr& msg) {
 }
 
 void TkcpSession::onConnectSyn() {
+    if (!kcpInited_) {
+        initKcp();
+    }
     Buffer sendbuf(8);
     EncodeUint32(&sendbuf, conv_);
     EncodeUint8(&sendbuf, packet::udp::kConnectSynAck);
@@ -192,19 +197,12 @@ void TkcpSession::onConnectSyn() {
 }
 
 void TkcpSession::onConnectSyncAck() {
-    initKcp(); // client
-    udpPingTimer_ = loop_->runEvery(60, boost::bind(&TkcpSession::udpPingRequest, this));
-    tcpPingTimer_ = loop_->runAfter(120, boost::bind(&TkcpSession::tcpPingRequest, this));
-
-    Buffer sendbuf(8);
-    EncodeUint32(&sendbuf, conv_);
-    EncodeUint8(&sendbuf, packet::udp::kConnectAck);
-    udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
-
-}
-
-void TkcpSession::onConnectAck() {
-    initKcp(); // server
+    if (!kcpInited_) {
+        assert(state_ == kUdpConnectSynSend);
+        initKcp(); // client
+        udpPingTimer_ = loop_->runEvery(60, boost::bind(&TkcpSession::udpPingRequest, this));
+        tcpPingTimer_ = loop_->runAfter(120, boost::bind(&TkcpSession::tcpPingRequest, this));
+    }
 }
 
 void TkcpSession::kcpUpdate() {
@@ -218,6 +216,9 @@ void TkcpSession::kcpUpdate() {
 
 void TkcpSession::initKcp() {
     assert(kcpcb_ == NULL);
+    assert(kcpInited_ == false);
+    assert(state_ == kTcpConnected || state_ == kUdpConnectSynSend);
+    kcpInited_ = true;
     kcpcb_  = ikcp_create(conv_, this);
     ikcp_setoutput(kcpcb_, kcpOutput);
     ikcp_nodelay(kcpcb_, 1, 30, 2, 1);
@@ -228,7 +229,7 @@ void TkcpSession::initKcp() {
     kcpUpdateTimer_ = loop_->runEvery(MillisecondToSecond(30),
                     boost::bind(&TkcpSession::kcpUpdate, this));
 
-    setState(KConnected);
+    setState(kConnected);
     tkcpConnectionCallback_(shared_from_this());
 }
 
@@ -252,8 +253,12 @@ void TkcpSession::udpPingRequest() {
 }
 
 void TkcpSession::onUdpData(const char* buf, size_t len) {
-    ikcp_input(kcpcb_, buf, static_cast<int>(len));
 
+    if (state_ != kConnected) {
+        return;
+    }
+
+    ikcp_input(kcpcb_, buf, static_cast<int>(len));
     int size = ikcp_peeksize(kcpcb_);
     if (size > 0) {
         Buffer message(static_cast<size_t>(size));
@@ -285,8 +290,8 @@ void TkcpSession::onTcpConnection(const TcpConnectionPtr& conn) {
     assert(conn->disconnected());
     if (conn->disconnected()) {
 
-        assert(state_ == KConnected || state_ == kDisconnecting);
-        setState(KDisconnected);
+        assert(state_ == kConnected || state_ == kTcpConnected || state_ == kUdpConnectSynSend);
+        setState(kDisconnected);
 
         loop_->cancel(udpPingTimer_);
         loop_->cancel(tcpPingTimer_);
@@ -341,11 +346,29 @@ void TkcpSession::onUdpconnectionInfo(Buffer* buf) {
     conv_ = connInfo.conv;
     peerAddressForUdp_ = InetAddress(connInfo.ip, connInfo.port);
 
+    setState(kUdpConnectSynSend);
+    sendConnectSyn();
+}
+void TkcpSession::sendConnectSyn(){
+
+    trySendConnectSynTimes++;
+    if (state_ != kUdpConnectSynSend || trySendConnectSyncTimes > 11) {
+        loop_->cancel(connectSyncAckTimer_);
+        if (trySendConnectSyncTimes > 11) {
+            LOG_INFO << "client trySendConnectSynTimes > 11";
+        }
+        return;
+    }
+
+    LOG_DEBUG << "trySendConnectSynTimes " << trySendConnectSyncTimes;
     Buffer sendbuf(8);
     EncodeUint32(&sendbuf, conv_);
     EncodeUint8(&sendbuf, packet::udp::kConnectSyn);
     udpOutputCallback_(shared_from_this(), sendbuf.peek(), sendbuf.readableBytes());
+    connectSyncAckTimer_ = loop_->runAfter(static_cast<double>(trySendConnectSyncTimes),
+                                           boost::bind(&TkcpSession::sendConnectSyn, this));
 }
+
 
 void TkcpSession::tcpPingRequest() {
     Buffer sendbuf(8);
@@ -371,6 +394,7 @@ void TkcpSession::onTcpPingReply(Buffer *buf) {
 }
 
 void TkcpSession::onTcpData(Buffer* buf) {
+    assert(state_ == kConnected);
     uint16_t len = DecodeUint16(buf);
     buf->retrieveInt8();
     size_t dataSize = len - packet::tcp::kPacketHeadLength;
@@ -382,18 +406,20 @@ void TkcpSession::onTcpData(Buffer* buf) {
 
 void TkcpSession::ConnectDestroyed() {
     loop_->assertInLoopThread();
-    if (state_ == KConnected) {
+    if (state_ == kConnected) {
 
         loop_->cancel(udpPingTimer_);
         loop_->cancel(tcpPingTimer_);
         loop_->cancel(kcpUpdateTimer_);
 
-        setState(KDisconnected);
+        setState(kDisconnected);
         tkcpConnectionCallback_(shared_from_this());
     }
     tcpConnectionPtr_.reset();
-    ikcp_release(kcpcb_);
-    kcpcb_ = NULL;
+    if (kcpcb_ != NULL) {
+        ikcp_release(kcpcb_);
+        kcpcb_ = NULL;
+    }
 }
 
 

@@ -42,7 +42,7 @@ int main(int argc, char* argv[])
     server.SetTkcpConnectionCallback(OnConnection);
     server.SetTkcpMessageCallback(OnMessage);
 
-    loop.runAfter(600, boost::bind(Stop, &loop));
+    //loop.runAfter(600, boost::bind(Stop, &loop));
 
     server.Start();
 

@@ -73,8 +73,6 @@ string PacketIdToString(uint8_t packetId) {
     switch(packetId) {
         case kConnectSyn:
             return "kConnectSyn";
-        case kConnectAck:
-            return "kConnectAck";
         case kConnectSynAck:
             return "kConnectSynAck";
         case kPingRequest:

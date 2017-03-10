@@ -33,8 +33,8 @@ namespace net {
             ~TkcpSession();
 
             EventLoop* GetLoop() const { return loop_; }
-            bool Connected() const { return state_ == KConnected; }
-            bool Disconnected() const { return state_ == KDisconnected; }
+            bool Connected() const { return state_ == kConnected; }
+            bool Disconnected() const { return state_ == kDisconnected; }
 
             void Send(const void* message, int len);
             void Send(const StringPiece& message);
@@ -79,9 +79,10 @@ namespace net {
             void onPingReply();
             void initKcp();
             void kcpUpdate();
-            void SendKcpMsg(const void *data, size_t len);
+            void sendKcpMsg(const void *data, size_t len);
             void onUdpData(const char* buf, size_t len);
 
+            void sendConnectSyn();
             void udpPingRequest();
             //for udp end
 
@@ -94,7 +95,13 @@ namespace net {
             //for tcp end
 
         private:
-            enum StateE { KDisconnected, KConnecting, KConnected, kDisconnecting };
+            enum StateE {
+                          kTcpConnected,
+                          kUdpConnectSynSend,
+                          kConnected,
+                          kDisconnecting,
+                          kDisconnected,
+            };
             const char* stateToString() const;
 
         private:
@@ -113,6 +120,7 @@ namespace net {
 
             InetAddress peerAddressForUdp_;
             InetAddress localAddressForUdp_;
+            bool kcpInited_;
             ikcpcb* kcpcb_;
 
 
@@ -122,6 +130,10 @@ namespace net {
 
 
             UdpOutputCallback udpOutputCallback_;
+
+            TimerId connectSyncAckTimer_;
+            int trySendConnectSyncTimes;
+
 
             TimerId kcpUpdateTimer_;
             uint32_t nextKcpUpdateTime_;

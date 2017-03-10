@@ -92,6 +92,7 @@ void runClient(const char* ip, uint16_t port) {
 
 int main(int argc, char* argv[]) {
     if (argc > 2) {
+        //Logger::setLogLevel(Logger::DEBUG);
 
         if (strcmp(argv[1], "-s") == 0) {
             uint16_t port = static_cast<uint16_t>(atoi(argv[3]));
