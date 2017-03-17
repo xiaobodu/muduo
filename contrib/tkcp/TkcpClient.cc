@@ -10,6 +10,7 @@
 
 #include "TkcpClient.h"
 #include "UdpMessage.h"
+#include "UdpSocket.h"
 
 
 
@@ -56,7 +57,7 @@ void TkcpClient::newTcpConnection(const TcpConnectionPtr& conn) {
 }
 
 void TkcpClient::removeTckpSession(const TkcpSessionPtr& sess) {
-
+    LOG_INFO << "TckpClient::removeTckpSession";
 }
 
 
@@ -79,7 +80,6 @@ void TkcpClient::handleRead(Timestamp receiveTime) {
         LOG_SYSERR << "TkcpClient::handleRead";
         handError();
     }
-
 
 }
 

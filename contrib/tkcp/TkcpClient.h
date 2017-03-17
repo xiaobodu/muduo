@@ -18,13 +18,13 @@
 
 #include "TkcpSession.h"
 #include "TkcpCallback.h"
-#include "UdpSocket.h"
 
 
 
 namespace muduo {
 
 namespace net {
+class UdpSocket;
 
 class TkcpClient : public boost::noncopyable {
     public:

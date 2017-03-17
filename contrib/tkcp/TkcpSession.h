@@ -14,13 +14,14 @@
 
 #include "kcp/ikcp.h"
 #include "TkcpCallback.h"
-#include "UdpMessage.h"
 
 
 
 namespace muduo {
 
 namespace net {
+    class UdpMessage;
+    typedef boost::shared_ptr<UdpMessage> UdpMessagePtr;
     typedef boost::function<int(const TkcpSessionPtr&, const char *, size_t)> UdpOutputCallback;
     class TkcpSession : public boost::noncopyable,
                         public boost::enable_shared_from_this<TkcpSession> {
@@ -66,6 +67,8 @@ namespace net {
             void onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp receiveTime);
             void ConnectDestroyed();
 
+            void Shutdown();
+
         private:
 
 
@@ -89,9 +92,11 @@ namespace net {
             //for tcp begin
             void onUdpconnectionInfo(Buffer* buf);
             void onTcpData(Buffer* buf);
+            void onUseTcp(Buffer* buf);
             void tcpPingRequest();
             void onTcpPingRequest(Buffer* buf);
             void onTcpPingReply(Buffer* buf);
+            void sendTcpMsg(const void *data, size_t len);
             //for tcp end
 
         private:
@@ -132,7 +137,8 @@ namespace net {
             UdpOutputCallback udpOutputCallback_;
 
             TimerId connectSyncAckTimer_;
-            int trySendConnectSyncTimes;
+            int trySendConnectSynTimes;
+            bool udpAvailble_;
 
 
             TimerId kcpUpdateTimer_;

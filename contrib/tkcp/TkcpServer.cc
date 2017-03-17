@@ -7,6 +7,7 @@
 #include <muduo/base/Logging.h>
 
 #include "TkcpServer.h"
+#include "UdpService.h"
 
 
 
@@ -26,11 +27,11 @@ TkcpServer::TkcpServer(EventLoop* loop,
       tkcpConnectionCallback_(defaultTkcpConnectionCallback),
       tkcpMessageCallback_(defaultTkcpMessageCallback),
       nextConv_(1),
-      udpService_(loop, udpListenAddr),
+      udpService_(new UdpService(loop, udpListenAddr)),
       tcpserver_(loop, tcpListenAddr, nameArg+":Tkcp") {
 
     tcpserver_.setConnectionCallback(boost::bind(&TkcpServer::newTcpConnection, this, _1));
-    udpService_.SetUdpMessageCallback(boost::bind(&TkcpServer::onUdpMessage, this, _1));
+    udpService_->SetUdpMessageCallback(boost::bind(&TkcpServer::onUdpMessage, this, _1));
 
 }
 
@@ -51,7 +52,7 @@ TkcpServer::~TkcpServer() {
 void TkcpServer::Start() {
     if (started_.getAndSet(1) == 0) {
         tcpserver_.start();
-        udpService_.Start();
+        udpService_->Start();
     }
 }
 
@@ -83,7 +84,7 @@ void TkcpServer::newTcpConnection(const TcpConnectionPtr& conn) {
 
 int TkcpServer::outPutUdpMessage(const TkcpSessionPtr& sess, const char* buf, size_t len) {
     UdpMessagePtr message(new UdpMessage(buf, len, sess->peerAddressForUdp()));
-    udpService_.SendMsg(message);
+    udpService_->SendMsg(message);
     return 0;
 }
 

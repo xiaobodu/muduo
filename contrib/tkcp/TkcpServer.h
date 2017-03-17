@@ -6,6 +6,7 @@
 #include <map>
 
 #include <boost/noncopyable.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include <muduo/base/Atomic.h>
 #include <muduo/base/Types.h>
@@ -16,7 +17,6 @@
 
 #include "TkcpSession.h"
 #include "TkcpCallback.h"
-#include "UdpService.h"
 
 
 
@@ -24,7 +24,7 @@ namespace muduo {
 
 namespace net {
 
-
+class UdpService;
 class TkcpServer : public boost::noncopyable {
     public:
         TkcpServer(EventLoop* loop,
@@ -74,7 +74,7 @@ class TkcpServer : public boost::noncopyable {
     uint32_t nextConv_;
     SessionMap sessions_;
 
-    UdpService udpService_;
+    boost::scoped_ptr<UdpService> udpService_;
     TcpServer tcpserver_;
 };
 

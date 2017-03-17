@@ -5,7 +5,6 @@
 #include <muduo/net/InetAddress.h>
 #include <muduo/base/Logging.h>
 #include <contrib/tkcp/TkcpServer.h>
-#include <gperftools/profiler.h>
 #include <boost/bind.hpp>
 
 using namespace muduo;
