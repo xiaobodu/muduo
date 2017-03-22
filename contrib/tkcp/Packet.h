@@ -23,7 +23,7 @@ namespace tcp {
 const size_t kPacketHeadLength = 3;
 
 struct TcpPacketHead {
-    uint16_t len;
+    uint16_t len; // 包含包头长度
     uint8_t  packetId;
 };
 
