@@ -10,6 +10,7 @@
 #include <muduo/net/SocketsOps.h>
 #include <gperftools/profiler.h>
 #include "UdpService.h"
+#include <sys/errno.h>
 
 
 
@@ -111,7 +112,12 @@ void UdpService::runInUdpMsgRecvThread() {
             loop_->runInLoop(boost::bind(&UdpService::messageInloop, this, boost::make_shared<UdpMessage>(recvBuffer, intetAddress)));
             LOG_TRACE << "recvfrom return, readn = " << nr << " from " << intetAddress.toIpPort();
          } else {
-             LOG_SYSERR << "recvfrom return";
+
+             if (errno != EAGAIN &&
+                 errno != EWOULDBLOCK &&
+                 errno != EINTR) {
+                 LOG_SYSERR << "recvfrom return";
+             }
          }
 
     }
