@@ -298,7 +298,7 @@ void EventLoop::handleRead()
 
 void EventLoop::doPendingFunctors()
 {
-  std::vector<Functor> functors;
+  std::list<Functor> functors;
   callingPendingFunctors_ = true;
 
   {
@@ -306,9 +306,11 @@ void EventLoop::doPendingFunctors()
   functors.swap(pendingFunctors_);
   }
 
-  for (size_t i = 0; i < functors.size(); ++i)
-  {
-    functors[i]();
+  for (std::list<Functor>::iterator it = functors.begin();
+       it != functors.end();
+       ++it) {
+
+      (*it)();
   }
   callingPendingFunctors_ = false;
 }

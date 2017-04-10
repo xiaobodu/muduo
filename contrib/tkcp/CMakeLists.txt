@@ -14,7 +14,7 @@ add_library(muduo_net_tkcp ${tkcp_SRCS})
 target_link_libraries(muduo_net_tkcp muduo_net muduo_net_ikcp profiler)
 
 add_library(muduo_net_tkcp11 ${tkcp_SRCS})
-target_link_libraries(muduo_net_tkcp11 muduo_net_cpp11 muduo_net_ikcp)
+target_link_libraries(muduo_net_tkcp11 muduo_net_cpp11 muduo_net_ikcp profiler)
 set_target_properties(muduo_net_tkcp11 PROPERTIES COMPILE_FLAGS "-std=c++0x")
 
 

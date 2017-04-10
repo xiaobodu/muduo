@@ -108,7 +108,7 @@ void TkcpServer::onUdpMessage(UdpMessagePtr& msg) {
 
     SessionMap::const_iterator iter = sessions_.find(conv);
 
-    assert(iter != sessions_.end());
+
     if (iter != sessions_.end()) {
         iter->second->InputUdpMessage(msg);
     }

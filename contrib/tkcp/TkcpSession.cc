@@ -363,7 +363,8 @@ void TkcpSession::onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timest
                     onTcpPingReply(buf);
                     break;
                 default:
-                    LOG_WARN << "unknown tcp message";
+                    buf->retrieve(len);
+                    LOG_WARN << "unknown tcp message " << packeId;
             }
         } else {
             break;

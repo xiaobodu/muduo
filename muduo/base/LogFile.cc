@@ -24,7 +24,6 @@ LogFile::LogFile(const string& basename,
     lastRoll_(0),
     lastFlush_(0)
 {
-  assert(basename.find('/') == string::npos);
   rollFile();
 }
 

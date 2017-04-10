@@ -12,6 +12,7 @@
 #define MUDUO_NET_EVENTLOOP_H
 
 #include <vector>
+#include <list>
 
 #include <boost/any.hpp>
 #include <boost/function.hpp>
@@ -169,7 +170,7 @@ class EventLoop : boost::noncopyable
   Channel* currentActiveChannel_;
 
   mutable MutexLock mutex_;
-  std::vector<Functor> pendingFunctors_; // @GuardedBy mutex_
+  std::list<Functor> pendingFunctors_; // @GuardedBy mutex_
 };
 
 }
