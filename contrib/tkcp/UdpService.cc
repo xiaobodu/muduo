@@ -62,8 +62,9 @@ void UdpService::Start() {
 
     udpMsgSendThread_->start();
     udpMsgRecvThread_->start();
-
+#ifdef PERFORMANCE_MONITOR
     loop_->runEvery(1.0, boost::bind(&UdpService::messagePerSecond, this));
+#endif
 
     LOG_TRACE << "UdpService::Start";
 }

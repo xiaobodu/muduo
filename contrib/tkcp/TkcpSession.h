@@ -14,6 +14,7 @@
 
 #include "kcp/ikcp.h"
 #include "TkcpCallback.h"
+#include "Fec.h"
 
 
 
@@ -84,6 +85,8 @@ namespace net {
             void kcpUpdate();
             void sendKcpMsg(const void *data, size_t len);
             void onUdpData(const char* buf, size_t len);
+            void onFecRecvData(const char* data, size_t len);
+            void onFecSendData(const char* data, size_t len);
 
             void sendConnectSyn();
             void udpPingRequest();
@@ -127,6 +130,10 @@ namespace net {
             InetAddress localAddressForUdp_;
             bool kcpInited_;
             ikcpcb* kcpcb_;
+            Buffer kcpRecvBuf_;
+            Fec fec_;
+            Buffer udpSendBuf_;
+            UdpOutputCallback udpOutputCallback_;
 
 
             TkcpCloseCallback tkcpCloseCallback_;
@@ -134,7 +141,6 @@ namespace net {
             TkcpMessageCallback tkcpMessageCallback_;
 
 
-            UdpOutputCallback udpOutputCallback_;
 
             TimerId connectSyncAckTimer_;
             int trySendConnectSynTimes;

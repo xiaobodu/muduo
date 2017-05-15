@@ -16,9 +16,9 @@ using namespace muduo::net;
 
 
 void OnMessage(const TkcpSessionPtr& conn, Buffer* buffer) {
-    //string hello(buffer->peek(), buffer->readableBytes());
-    //LOG_DEBUG << "received " << hello;
-    //conn->Send(buffer);
+    string hello(buffer->peek(), buffer->readableBytes());
+    LOG_DEBUG << "received " << hello;
+    conn->Send(buffer);
     buffer->retrieveAll();
 }
 
@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    Logger::setLogLevel(Logger::INFO);
+    Logger::setLogLevel(Logger::DEBUG);
 
     std::vector<TkcpClientPtr> clients;
     EventLoop loop;

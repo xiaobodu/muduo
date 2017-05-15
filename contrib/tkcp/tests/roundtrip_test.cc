@@ -30,7 +30,7 @@ void ServerMessageCallback(const TkcpSessionPtr& sess,
 
 void runServer(const char* ip, uint16_t port) {
     EventLoop loop;
-    TkcpServer server(&loop, InetAddress(ip, port), InetAddress(ip, static_cast<uint16_t>(port+1)), "clockSever");
+    TkcpServer server(&loop, InetAddress(ip, port), InetAddress(ip, static_cast<uint16_t>(port+1)), InetAddress(ip, static_cast<uint16_t>(port+1)), "clockSever");
     server.SetTkcpMessageCallback(ServerMessageCallback);
     server.Start();
     loop.loop();

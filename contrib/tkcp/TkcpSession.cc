@@ -49,7 +49,8 @@ TkcpSession::TkcpSession(uint32_t conv,
         const InetAddress& localAddressForUdp,
         const TcpConnectionPtr& tcpConnectionPtr,
         const string& nameArg)
-    : loop_(tcpConnectionPtr->getLoop()),
+    :
+      loop_(tcpConnectionPtr->getLoop()),
       conv_(conv),
       name_(nameArg),
       tcpConnectionPtr_(tcpConnectionPtr),
@@ -57,9 +58,14 @@ TkcpSession::TkcpSession(uint32_t conv,
       localAddressForUdp_(localAddressForUdp),
       kcpInited_(false),
       kcpcb_(NULL),
+      kcpRecvBuf_(2048),
       trySendConnectSynTimes(0),
       udpAvailble_(true),
       nextKcpUpdateTime_(0) {
+
+
+    fec_.setSendOutCallback(boost::bind(&TkcpSession::onFecSendData, this, _1, _2));
+    fec_.setRecvOutCallback(boost::bind(&TkcpSession::onFecRecvData, this, _1, _2));
 
     LOG_DEBUG << "TkcpSession::ctor[" << name_ << "] at" << this;
 }
@@ -154,14 +160,19 @@ void TkcpSession::sendTcpMsg(const void *data, size_t len) {
 
 
 int TkcpSession::handleKcpOutput(const char* buf, int len) {
-    if (udpOutputCallback_) {
-        Buffer message;
-        EncodeUint32(&message, conv_);
-        EncodeUint8(&message, packet::udp::kData);
-        message.append(buf, static_cast<size_t>(len));
-        return udpOutputCallback_(shared_from_this(), message.peek(), message.readableBytes());
-    }
+    fec_.Send(buf, static_cast<size_t>(len));
     return 0;
+}
+
+void TkcpSession::onFecSendData(const char* data, size_t len) {
+
+    if (udpOutputCallback_) {
+        EncodeUint32(&udpSendBuf_, conv_);
+        EncodeUint8(&udpSendBuf_, packet::udp::kData);
+        udpSendBuf_.append(data, len);
+        udpOutputCallback_(shared_from_this(), udpSendBuf_.peek(), udpSendBuf_.readableBytes());
+        udpSendBuf_.retrieveAll();
+    }
 }
 
 int TkcpSession::kcpOutput(const char* buf, int len, struct IKCPCB* kcp, void *user) {
@@ -251,7 +262,7 @@ void TkcpSession::initKcp() {
     ikcp_setoutput(kcpcb_, kcpOutput);
     ikcp_nodelay(kcpcb_, 1, 30, 2, 1);
     ikcp_wndsize(kcpcb_, 128, 128);
-    ikcp_setmtu(kcpcb_, 576 - 64 - packet::udp::kPacketHeadLength);
+    ikcp_setmtu(kcpcb_, (576 - 20 - 8 - packet::udp::kPacketHeadLength - 3 * Fec::FecHeadLen)/3);
     kcpcb_->rx_minrto = 10;
 
     kcpUpdateTimer_ = loop_->runEvery(MillisecondToSecond(30),
@@ -286,14 +297,19 @@ void TkcpSession::onUdpData(const char* buf, size_t len) {
         return;
     }
 
-    ikcp_input(kcpcb_, buf, static_cast<int>(len));
+    fec_.Input(buf, len);
+}
+
+void TkcpSession::onFecRecvData(const char* data, size_t len) {
+    ikcp_input(kcpcb_, data, static_cast<int>(len));
     int size = ikcp_peeksize(kcpcb_);
     if (size > 0) {
-        Buffer message(static_cast<size_t>(size));
-        int nr = ikcp_recv(kcpcb_, message.beginWrite(), static_cast<int>(message.writableBytes()));
+
+        int nr = ikcp_recv(kcpcb_, kcpRecvBuf_.beginWrite(), static_cast<int>(kcpRecvBuf_.writableBytes()));
         assert(size == nr);
-        message.hasWritten(nr);
-        tkcpMessageCallback_(shared_from_this(), &message);
+        kcpRecvBuf_.hasWritten(nr);
+        tkcpMessageCallback_(shared_from_this(), &kcpRecvBuf_);
+        kcpRecvBuf_.retrieveAll();
     }
     ikcp_flush(kcpcb_);
 }

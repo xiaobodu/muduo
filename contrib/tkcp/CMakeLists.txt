@@ -7,6 +7,7 @@ set(tkcp_SRCS
     Coding.cc
     Packet.cc
     TkcpClient.cc
+    Fec.cc
     )
 
 

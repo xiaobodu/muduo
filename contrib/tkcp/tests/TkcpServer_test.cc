@@ -30,14 +30,14 @@ int main(int argc, char* argv[])
         return 1;
     }
     //ProfilerStart("Test");
-    Logger::setLogLevel(Logger::INFO);
+    Logger::setLogLevel(Logger::DEBUG);
     InetAddress tcpAddr(argv[1], static_cast<uint16_t>(atoi(argv[2])));
     InetAddress udpaddr(argv[1], static_cast<uint16_t>(atoi(argv[3])));
 
 
     EventLoop loop;
 
-    TkcpServer server(&loop, tcpAddr, udpaddr, "test");
+    TkcpServer server(&loop, tcpAddr, udpaddr, udpaddr, "test");
     server.SetTkcpConnectionCallback(OnConnection);
     server.SetTkcpMessageCallback(OnMessage);
 

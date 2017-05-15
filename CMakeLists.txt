@@ -28,7 +28,7 @@ set(CXX_FLAGS
  #-DPERFORMANCE_MONITOR
  #-fno-omit-frame-pointer
  # -MMD
- # -std=c++0x
+ -std=c++0x
  -rdynamic
  )
 if(CMAKE_BUILD_BITS EQUAL 32)

@@ -30,11 +30,14 @@ class TkcpServer : public boost::noncopyable {
         TkcpServer(EventLoop* loop,
                    const InetAddress& tcpListenAddr,
                    const InetAddress& udpListenAddr,
+                   const InetAddress& outUdpListenAddr,
                    const string& nameArg);
         ~TkcpServer();
 
         const InetAddress& tcpListenAddress() const { return tcpListenAddress_; }
         const InetAddress& udpListenAddress() const { return udpListenAddress_; }
+        const InetAddress& outUdpListenAddress() const { return outUdpListenAddress_; }
+
         const string& name() const { return name_; }
         EventLoop* getLoop() const { return loop_; }
 
@@ -64,6 +67,7 @@ class TkcpServer : public boost::noncopyable {
     EventLoop* loop_;
     const InetAddress tcpListenAddress_;
     const InetAddress udpListenAddress_;
+    const InetAddress outUdpListenAddress_;
     const string name_;
 
     TkcpConnectionCallback tkcpConnectionCallback_;
