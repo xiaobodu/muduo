@@ -14,13 +14,14 @@
 
 #include "kcp/ikcp.h"
 #include "TkcpCallback.h"
-#include "Fec.h"
+
 
 
 
 namespace muduo {
 
 namespace net {
+    class Fec;
     class UdpMessage;
     typedef boost::shared_ptr<UdpMessage> UdpMessagePtr;
     typedef boost::function<int(const TkcpSessionPtr&, const char *, size_t)> UdpOutputCallback;
@@ -131,7 +132,7 @@ namespace net {
             bool kcpInited_;
             ikcpcb* kcpcb_;
             Buffer kcpRecvBuf_;
-            Fec fec_;
+            boost::shared_ptr<Fec> fec_;
             Buffer udpSendBuf_;
             UdpOutputCallback udpOutputCallback_;
 

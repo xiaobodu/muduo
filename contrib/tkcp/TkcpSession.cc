@@ -13,6 +13,7 @@
 #include "Packet.h"
 #include "Coding.h"
 #include "UdpMessage.h"
+#include "Fec.h"
 
 namespace muduo {
 
@@ -63,9 +64,9 @@ TkcpSession::TkcpSession(uint32_t conv,
       udpAvailble_(true),
       nextKcpUpdateTime_(0) {
 
-
-    fec_.setSendOutCallback(boost::bind(&TkcpSession::onFecSendData, this, _1, _2));
-    fec_.setRecvOutCallback(boost::bind(&TkcpSession::onFecRecvData, this, _1, _2));
+    fec_.reset(new Fec());
+    fec_->setSendOutCallback(boost::bind(&TkcpSession::onFecSendData, this, _1, _2));
+    fec_->setRecvOutCallback(boost::bind(&TkcpSession::onFecRecvData, this, _1, _2));
 
     LOG_DEBUG << "TkcpSession::ctor[" << name_ << "] at" << this;
 }
@@ -160,7 +161,7 @@ void TkcpSession::sendTcpMsg(const void *data, size_t len) {
 
 
 int TkcpSession::handleKcpOutput(const char* buf, int len) {
-    fec_.Send(buf, static_cast<size_t>(len));
+    fec_->Send(buf, static_cast<size_t>(len));
     return 0;
 }
 
@@ -297,7 +298,7 @@ void TkcpSession::onUdpData(const char* buf, size_t len) {
         return;
     }
 
-    fec_.Input(buf, len);
+    fec_->Input(buf, len);
 }
 
 void TkcpSession::onFecRecvData(const char* data, size_t len) {
