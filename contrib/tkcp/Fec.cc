@@ -11,7 +11,9 @@ namespace muduo {
 namespace net{
 
 Fec::Fec()
-    : sendSeq_(0){}
+    : sendSeq_(0){
+    bzero(receivedSeqs_, sizeof(receivedSeqs_));
+}
 
 void Fec::Send(const char* data, size_t size) {
     assert(size <= 175);
@@ -36,15 +38,14 @@ void Fec::Input(const char* data, size_t size) {
     while (inputBuf_.readableBytes() > 0) {
         uint32_t seq = DecodeUint32(&inputBuf_);
         uint16_t len = DecodeUint16(&inputBuf_);
-        auto it = receivedSeqSet_.find(seq);
-        if (it == receivedSeqSet_.end()) {
-            receivedSeqSet_.insert(seq);
+        uint32_t index = seq % ReceivedSeqsLen;
+        if (seq != receivedSeqs_[index]) {
+            receivedSeqs_[index] = seq;
             recvOutCallback_(inputBuf_.peek(), len);
         }
         inputBuf_.retrieve(len);
     }
     assert(inputBuf_.readableBytes() == 0);
-
 }
 }
 }

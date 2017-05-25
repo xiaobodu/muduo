@@ -381,7 +381,8 @@ void TkcpSession::onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timest
                     break;
                 default:
                     buf->retrieve(len);
-                    LOG_WARN << "unknown tcp message " << packeId;
+                    LOG_WARN << "unknown tcp message " << packeId << " from " << tcpConnectionPtr_->peerAddress().toIpPort();
+                    forceClose();
             }
         } else {
             break;
@@ -492,6 +493,13 @@ void TkcpSession::Shutdown() {
     if (state_ == kConnected) {
         setState(kDisconnecting);
         tcpConnectionPtr_->shutdown();
+    }
+}
+
+void TkcpSession::forceClose() {
+    if (state_ == kConnected || state_ == kDisconnecting) {
+        setState(kDisconnecting);
+        tcpConnectionPtr_->forceClose();
     }
 }
 

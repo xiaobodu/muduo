@@ -15,7 +15,10 @@ typedef boost::function<void(const char*, size_t)> FecOutCallback;
 class Fec {
     private:
         uint32_t sendSeq_;
-        boost::unordered_set<uint32_t> receivedSeqSet_;
+        const static uint32_t ReceivedSeqsLen = 128;
+        uint32_t receivedSeqs_[ReceivedSeqsLen];
+
+
         FecOutCallback sendOutCallback_;
         FecOutCallback recvOutCallback_;
         Buffer oneSendBuf_;

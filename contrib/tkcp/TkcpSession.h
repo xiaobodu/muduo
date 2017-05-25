@@ -103,6 +103,9 @@ namespace net {
             void sendTcpMsg(const void *data, size_t len);
             //for tcp end
 
+
+            void forceClose();
+
         private:
             enum StateE {
                           kTcpConnected,
