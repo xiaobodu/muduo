@@ -11,4 +11,5 @@ else()
 endif()
 
 
-add_subdirectory(tkcp)
+#add_subdirectory(tkcp)
+add_subdirectory(rudp)
