@@ -26,10 +26,14 @@ ReliableConnection::ReliableConnection(EventLoop* loop, uint16_t maxWindowSize, 
 	flush_(mss),
 	maxPacketLength_(maxPackLength),
 	redundant_(0)
-{}
+{
+    LOG_DEBUG << "ReliableConnection::ctor at " << this;
+}
 
 ReliableConnection::~ReliableConnection()
-{}
+{
+    LOG_DEBUG << "ReliableConnection::dtor at " << this;
+}
 
 uint16_t ReliableConnection::getMssSize() const
 {
@@ -167,7 +171,7 @@ void ReliableConnection::postImmediatelyUpdate()
 }
 
 void ReliableConnection::update(uint32_t nowTs, bool fromTimer)
-{	
+{
 	// update逻辑
 	uint32_t nextTs = nowTs;
 	while (nextTs <= nowTs && (status_ & kEstablish))

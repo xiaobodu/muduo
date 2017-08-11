@@ -45,17 +45,19 @@ ReliableUdpServer::ReliableUdpServer(EventLoop* loop,
 ReliableUdpServer::~ReliableUdpServer() {
     loop_->assertInLoopThread();
     LOG_DEBUG << "ReliableUdpServer::~ReliableUdpServer [" << name_ << "] destructing";
-    mutex_.lock();
 
-    for (auto iter(connections_.begin());
-            iter != connections_.end(); ++iter) {
-        auto conn = iter->second;
-        iter->second.reset();
-        conn->getLoop()->runInLoop(
-                boost::bind(&ReliableUdpConnection::ConnectDestroyed, conn));
-        conn.reset();
+    for (int i = 0; i < kConnectionsMapNum; ++i) {
+
+        MutexLockGuard lock(mutex_[i]);
+        for (auto iter(connectionsMaps_[i].begin());
+                iter != connectionsMaps_[i].end(); ++iter) {
+            auto conn = iter->second;
+            iter->second.reset();
+            conn->getLoop()->runInLoop(
+                    boost::bind(&ReliableUdpConnection::ConnectDestroyed, conn));
+            conn.reset();
+        }
     }
-    mutex_.unlock();
 }
 
 void ReliableUdpServer::setThreadNum(int numThreads) {
@@ -123,9 +125,11 @@ void ReliableUdpServer::handleUdpMessage(const UdpServerSocketPtr& socket,
 
     ReliableUdpConnectionPtr conn;
     {
-        MutexLockGuard lock(mutex_);
-        auto connIter = connections_.find(convId);
-        if (connIter != connections_.end()) {
+
+        int connectionsIndex  = convId % kConnectionsMapNum;
+        MutexLockGuard lock(mutex_[connectionsIndex]);
+        auto connIter = connectionsMaps_[connectionsIndex].find(convId);
+        if (connIter != connectionsMaps_[connectionsIndex].end()) {
             conn = connIter->second;
         }
     }
@@ -203,12 +207,13 @@ void ReliableUdpServer::removeConnectionInLoop(uint64_t convId, const ReliableUd
     (void)n;
     assert(n == 1);
     {
-        MutexLockGuard lock(mutex_);
-        n = connections_.erase(convId);
+        int connectionsIndex = convId % kConnectionsMapNum;
+        MutexLockGuard lock(mutex_[connectionsIndex]);
+        n = connectionsMaps_[connectionsIndex].erase(convId);
         assert(n == 1);
     }
     auto ioLoop = conn->getLoop();
-    ioLoop->queueInLoop(boost::bind(&ReliableUdpConnection::ConnectDestroyed, conn));
+    ioLoop->runInLoop(boost::bind(&ReliableUdpConnection::ConnectDestroyed, conn));
 }
 
 
@@ -219,6 +224,7 @@ uint64_t ReliableUdpServer::genConvId() {
         ++iter;
         ++index;
     }
+    convIndexs_.insert(index);
 
     uint64_t convId = (uint64_t(serverId_) << 32) | index;
     return convId;
@@ -257,8 +263,9 @@ void ReliableUdpServer::newConnectionInLoop(const UdpServerSocketPtr& socket,
     conn->setAckDelay(true, 1);
 
     {
-        MutexLockGuard lock(mutex_);
-        connections_[convId] = conn;
+        int connectionsIndex = convId % kConnectionsMapNum;
+        MutexLockGuard lock(mutex_[connectionsIndex]);
+        connectionsMaps_[connectionsIndex][convId] = conn;
     }
 
     if (socket->getLoop()->isInLoopThread()) {
@@ -282,8 +289,10 @@ void ReliableUdpServer::onConnectionEstablishCallback(uint64_t convId, const Ine
 void ReliableUdpServer::onConnectionEstablishCallbackInLoop(uint64_t convId, const InetAddress& addres, const ReliableUdpConnectionPtr& conn, bool isSuccess) {
 
     if (!isSuccess) {
-       MutexLockGuard lock(mutex_);
-       connections_.erase(convId);
+
+       int connectionIndex = convId % kConnectionsMapNum;
+       MutexLockGuard lock(mutex_[connectionIndex]);
+       connectionsMaps_[connectionIndex].erase(convId);
     }
     inConnectingIpPortSet_.erase(addres.toIpPort());
 }

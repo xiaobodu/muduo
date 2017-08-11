@@ -32,6 +32,8 @@ class EventLoopThreadPool;
 
 namespace rudp {
 
+const int kConnectionsMapNum = 32;
+
 class ReliableUdpServer : boost::noncopyable,
                           public boost::enable_shared_from_this<ReliableUdpServer> {
     public:
@@ -113,8 +115,8 @@ class ReliableUdpServer : boost::noncopyable,
         ThreadInitCallback threadInitCallback_;
         AtomicInt32 started_;
 
-        mutable MutexLock mutex_;
-        ConnectionMap connections_;
+        mutable MutexLock mutex_[kConnectionsMapNum];
+        ConnectionMap connectionsMaps_[kConnectionsMapNum];
 
         InConnectingIpPortSet inConnectingIpPortSet_;
 };

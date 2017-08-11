@@ -39,7 +39,6 @@ static uint16_t getProtocolPacketLength(uint16_t mssSize)
     return std::min<uint16_t>(static_cast<uint16_t>(mssSize - mateInfoSize), static_cast<uint16_t>(DATAGRAM_PACK_SIZE_V6));
 }
 
-AtomicInt64 ReliableUdpConnection::connNum;
 
 ReliableUdpConnection::ReliableUdpConnection(EventLoop* loop,
                                                    const string& name,
@@ -50,12 +49,12 @@ ReliableUdpConnection::ReliableUdpConnection(EventLoop* loop,
     : loop_(CHECK_NOTNULL(loop)),
       name_(name),
       state_(kConnecting),
-      reliable_(new ReliableConnection(loop, maxWindowSize, mssSize, getProtocolPacketLength(mssSize))),
+      reliable_(new ReliableConnection(loop_, maxWindowSize, mssSize, getProtocolPacketLength(mssSize))),
       localAddr_(localAddr),
       peerAddr_(peerAddr) {
 
-    connNum.increment();
-    LOG_DEBUG << "ReliableUdpConnection::ctor[" << name_ << "] at " << this << " connNum is " << connNum.get();
+    LOG_DEBUG << "ReliableUdpConnection::ctor[" << name_ << "] at " << this;
+    LOG_DEBUG << "ReliableUdpConnection::ctor[" << name_ << "] at " << this;
     reliable_->setPacketHandler(boost::bind(&ReliableUdpConnection::onReliableConnectionMessage, this, _1, _2));
     reliable_->setFlushHandler(boost::bind(&ReliableUdpConnection::onReliableConnectionFlush, this, _1, _2));
 }
@@ -63,7 +62,6 @@ ReliableUdpConnection::ReliableUdpConnection(EventLoop* loop,
 ReliableUdpConnection::~ReliableUdpConnection() {
     LOG_DEBUG << "ReliableUdpConnection::dtor[" << name_ << "] at " << this;
     assert(state_ == kDisconnected);
-    connNum.decrement();
 }
 
 
@@ -184,7 +182,7 @@ void ReliableUdpConnection::ConnectEstablished(const void* handshakeMessage, std
 void ReliableUdpConnection::ConnectDestroyed() {
     loop_->assertInLoopThread();
 
-    if (state_ == KConnected) {
+    if (state_ == KConnected || state_ == kDisconnecting) {
         setState(kDisconnected);
         reliable_->destroy();
     }
@@ -201,7 +199,6 @@ void ReliableUdpConnection::closeInLoop() {
     loop_->assertInLoopThread();
 
     assert(state_ == kDisconnecting);
-    setState(kDisconnected);
     ReliableUdpConnectionPtr guardThis(shared_from_this());
     connectionCallback_(guardThis);
     closeCallback_(guardThis);

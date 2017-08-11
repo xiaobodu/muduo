@@ -154,10 +154,8 @@ private:
     Buffer inputBuffer_;
 
     boost::any context_;
-    static AtomicInt64 connNum;
 
     TimerId connectEstabliseTimeId_;
-
 };
 
 }
