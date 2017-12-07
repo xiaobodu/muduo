@@ -70,6 +70,7 @@ namespace net {
             void ConnectDestroyed();
 
             void Shutdown();
+            void Close();
 
         private:
 

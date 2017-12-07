@@ -69,6 +69,7 @@ void TkcpServer::newTcpConnection(const TcpConnectionPtr& conn) {
         LOG_INFO << "TkcpServer::newTkcpConnection [" << name_
                  << "] - new sess [" << sessName
                  << "]";
+        conn->setTcpNoDelay(true);
         TkcpSessionPtr sess = TkcpSessionPtr(new TkcpSession(conv, outUdpListenAddress_, conn, sessName));
         conn->setConnectionCallback(boost::bind(&TkcpSession::onTcpConnection, sess, _1));
         conn->setMessageCallback(boost::bind(&TkcpSession::onTcpMessage, sess, _1, _2, _3));

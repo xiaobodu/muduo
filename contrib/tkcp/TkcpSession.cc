@@ -221,7 +221,8 @@ void TkcpSession::InputUdpMessage(UdpMessagePtr& msg) {
             onPingReply();
             break;
         default:
-            LOG_WARN << "unknown udp message";
+            LOG_WARN << "unknown udp message " << packeId << " from " << msg->intetAddress().toIpPort();
+            forceClose();
     }
 }
 
@@ -335,7 +336,7 @@ void TkcpSession::onTcpConnection(const TcpConnectionPtr& conn) {
     assert(conn->disconnected());
     if (conn->disconnected()) {
 
-        assert(state_ == kConnected || state_ == kTcpConnected || state_ == kUdpConnectSynSend);
+        assert(state_ == kConnected || state_ == kTcpConnected || state_ == kUdpConnectSynSend || state_ == kDisconnecting);
         setState(kDisconnected);
 
         loop_->cancel(udpPingTimer_);
@@ -380,7 +381,7 @@ void TkcpSession::onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Timest
                     onTcpPingReply(buf);
                     break;
                 default:
-                    buf->retrieve(len);
+                    buf->retrieveAll();
                     LOG_WARN << "unknown tcp message " << packeId << " from " << tcpConnectionPtr_->peerAddress().toIpPort();
                     forceClose();
             }
@@ -465,7 +466,6 @@ void TkcpSession::onTcpData(Buffer* buf) {
 
 void TkcpSession::onUseTcp(Buffer* buf) {
     buf->retrieve(packet::tcp::KUseTcp);
-    assert(state_ == kTcpConnected);
     udpAvailble_ = false;
     setState(kConnected);
     tkcpConnectionCallback_(shared_from_this());
@@ -497,10 +497,14 @@ void TkcpSession::Shutdown() {
 }
 
 void TkcpSession::forceClose() {
-    if (state_ == kConnected || state_ == kDisconnecting) {
+    if (state_ != kDisconnecting && state_ != kDisconnected) {
         setState(kDisconnecting);
         tcpConnectionPtr_->forceClose();
     }
+}
+
+void TkcpSession::Close() {
+    forceClose();
 }
 
 }

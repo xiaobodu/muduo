@@ -9,6 +9,7 @@
 #include <string>
 #endif
 #include <boost/noncopyable.hpp>
+#include <vector>
 
 namespace muduo
 {
@@ -158,6 +159,17 @@ class LogStream : boost::noncopyable
     *this << v.toStringPiece();
     return *this;
   }
+
+
+  template<typename T>
+  self& operator<<(const std::vector<T> v) {
+      *this << "[ ";
+      for (auto& item : v) {
+          *this << item << " ";
+      }
+      *this << "]";
+      return *this;
+}
 
   void append(const char* data, int len) { buffer_.append(data, len); }
   const Buffer& buffer() const { return buffer_; }
