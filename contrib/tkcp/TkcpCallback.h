@@ -1,7 +1,6 @@
 #pragma once
 
 #include <boost/function.hpp>
-#include <boost/function.hpp>
 #include <muduo/base/Timestamp.h>
 
 namespace muduo {
@@ -11,16 +10,16 @@ namespace muduo {
 namespace net {
 
 class Buffer;
-class TkcpSession;
+class TkcpConnection;
 
-typedef boost::shared_ptr<TkcpSession> TkcpSessionPtr;
-typedef boost::function<void (const TkcpSessionPtr&)> TkcpConnectionCallback;
-typedef boost::function<void (const TkcpSessionPtr&)> TkcpCloseCallback;
-typedef boost::function<void (const TkcpSessionPtr&, Buffer*)> TkcpMessageCallback;
+typedef boost::shared_ptr<TkcpConnection> TkcpConnectionPtr;
+typedef boost::function<void (const TkcpConnectionPtr&)> TkcpConnectionCallback;
+typedef boost::function<void (const TkcpConnectionPtr&)> TkcpCloseCallback;
+typedef boost::function<void (const TkcpConnectionPtr&, Buffer*)> TkcpMessageCallback;
 
 
-void defaultTkcpConnectionCallback(const TkcpSessionPtr& conn);
-void defaultTkcpMessageCallback(const TkcpSessionPtr& conn,
+void defaultTkcpConnectionCallback(const TkcpConnectionPtr& conn);
+void defaultTkcpMessageCallback(const TkcpConnectionPtr& conn,
                                 Buffer* buffer);
 
 }

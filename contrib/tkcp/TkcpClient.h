@@ -13,23 +13,27 @@
 #include <muduo/net/EventLoop.h>
 #include <muduo/net/InetAddress.h>
 #include <muduo/net/TcpClient.h>
-#include <muduo/net/Channel.h>
 
+#include <muduo/net/udp/UdpClientSocket.h>
 
-#include "TkcpSession.h"
+#include "TkcpConnection.h"
 #include "TkcpCallback.h"
+
 
 
 
 namespace muduo {
 
 namespace net {
-class UdpSocket;
+
+
+
+
 
 class TkcpClient : public boost::noncopyable {
     public:
         TkcpClient(EventLoop* loop,
-                   const InetAddress& serverAddrForTcp,
+                   const InetAddress& peerAddress,
                    const string& nameArg);
         ~TkcpClient();
 
@@ -39,7 +43,7 @@ class TkcpClient : public boost::noncopyable {
         EventLoop* getLoop() const { return loop_; }
         const string& name() const { return name_; }
 
-        TkcpSessionPtr Sess() const { return sess_; }
+        TkcpConnectionPtr conn() const { return kcpConn_; }
 
         void SetTkcpConnectionCallback(const TkcpConnectionCallback& cb) {
             tkcpConnectionCallback_ = cb;
@@ -54,37 +58,29 @@ class TkcpClient : public boost::noncopyable {
     public:
     private:
         void newTcpConnection(const TcpConnectionPtr& conn);
-        void removeTckpSession(const TkcpSessionPtr& sess);
+        void removeTckpconnion(const TkcpConnectionPtr& conn);
 
     private:
-        // for udp begin
-        void handleRead(Timestamp receiveTime);
-        void handWrite();
-        void handError();
-        void connectUdpsocket();
-        int sendUdpMsg(const char* buf, size_t len);
-        int outPutUdpMessage(const TkcpSessionPtr& sess, const char* buf, size_t len);
 
-        // for udp end
+        void udpMessageCallback(const UdpClientSocketPtr& socket, Buffer* buf, Timestamp) ;
+        void udpConnectCallback(const UdpClientSocketPtr& socket, UdpClientSocket::ConnectResult result) ;
+        void udpDisconnectCallback(const UdpClientSocketPtr& socket, UdpClientSocket::DisconnectResutl result);
+
 
     private:
         muduo::net::EventLoop* loop_;
         const string name_;
-        InetAddress serverAddrForTcp_;
-        InetAddress serverAddrForUdp_;
+        InetAddress peerAddress_;
 
         TkcpConnectionCallback tkcpConnectionCallback_;
         TkcpMessageCallback tkcpMessageCallback_;
 
-        bool udpsocketConnected;
-        boost::scoped_ptr<Channel> udpChannel_;
-        boost::scoped_ptr<UdpSocket> udpsocket_;
+
 
         TcpClient tcpClient_;
-        TkcpSessionPtr sess_;
+        TkcpConnectionPtr kcpConn_;
 
-        typedef std::queue<string> stringqueue;
-        stringqueue outputUdMessagesCache_;
+        UdpClientSocketPtr socket_;
 };
 
 

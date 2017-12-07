@@ -10,11 +10,11 @@
 using namespace muduo;
 using namespace muduo::net;
 
-void OnConnection(const TkcpSessionPtr& sess) {
+void OnConnection(const TkcpConnectionPtr& sess) {
     LOG_DEBUG << "New TkcpConn";
 }
 
-void OnMessage(const TkcpSessionPtr& sess, Buffer* buffer) {
+void OnMessage(const TkcpConnectionPtr& sess, Buffer* buffer) {
     sess->Send(buffer);
 }
 

@@ -44,7 +44,7 @@ UdpSocket::~UdpSocket() {
 
 int UdpSocket::Connect(const InetAddress& address) {
     assert(!IsConnected());
-    assert(!remoteAddress_.get());
+    assert(!peerAddress_.get());
 
     int addrFamily = address.family();
     int rv = CreateSocket(addrFamily);
@@ -65,7 +65,7 @@ int UdpSocket::Connect(const InetAddress& address) {
         return lastError;
     }
 
-    remoteAddress_.reset(new InetAddress(address));
+    peerAddress_.reset(new InetAddress(address));
     return rv;
 }
 
@@ -331,7 +331,7 @@ int UdpSocket::peerAddress(InetAddress* address) const {
         return ENOTCONN;
     }
 
-    if (!remoteAddress_.get()) {
+    if (!peerAddress_.get()) {
         SockaddrStorage storage;
         if (getpeername(sockfd_, storage.Addr, &storage.AddrLen) < 0) {
             return errno;
@@ -342,9 +342,9 @@ int UdpSocket::peerAddress(InetAddress* address) const {
             return EADDRNOTAVAIL;
         }
 
-        remoteAddress_.swap(inetAddr);
+        peerAddress_.swap(inetAddr);
     }
 
-    *address = *remoteAddress_;
+    *address = *peerAddress_;
     return 0;
 }

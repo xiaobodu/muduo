@@ -6,11 +6,13 @@
 #include <muduo/base/Timestamp.h>
 #include <muduo/net/Buffer.h>
 #include <muduo/net/EventLoop.h>
-#include <contrib/rudp/UdpServerSocket.h>
+#include <muduo/net/EventLoopThread.h>
+#include <muduo/net/inspect/Inspector.h>
+#include <muduo/net/udp/UdpServerSocket.h>
 
 using namespace muduo;
 using namespace muduo::net;
-using namespace muduo::net::rudp;
+
 
 int64_t g_BytesRead = 0;
 int64_t g_MessageRead = 0;
@@ -49,6 +51,8 @@ int main(int argc, char *argv[])
         Logger::setLogLevel(Logger::DEBUG);
         EventLoop loop;
 
+        EventLoopThread t;
+        Inspector ins(t.startLoop(), InetAddress(12345), "PingPong");
 
         auto socket = UdpServerSocket::MakeUdpServerSocket(&loop, listenAddr, "PingPong");
 

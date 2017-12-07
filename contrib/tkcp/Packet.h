@@ -39,8 +39,6 @@ enum TcpPacketId {
 
 struct UdpConnectionInfo : public TcpPacketHead {
     uint32_t conv;
-    string ip;
-    uint16_t port;
     void Encode(Buffer* buf);
     void Decode(Buffer* buf);
     size_t Size();

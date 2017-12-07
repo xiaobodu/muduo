@@ -11,8 +11,10 @@
 #include <muduo/net/TcpConnection.h>
 #include <muduo/base/Timestamp.h>
 #include <muduo/net/TimerId.h>
+#include <muduo/net/Buffer.h>
+#include <muduo/net/InetAddress.h>
 
-#include "kcp/ikcp.h"
+#include <kcp/ikcp.h>
 #include "TkcpCallback.h"
 
 
@@ -24,18 +26,19 @@ namespace net {
     class Fec;
     class UdpMessage;
     typedef boost::shared_ptr<UdpMessage> UdpMessagePtr;
-    typedef boost::function<int(const TkcpSessionPtr&, const char *, size_t)> UdpOutputCallback;
-    class TkcpSession : public boost::noncopyable,
-                        public boost::enable_shared_from_this<TkcpSession> {
+    typedef boost::function<int(const TkcpConnectionPtr&, const char *, size_t)> UdpOutputCallback;
+    class TkcpConnection : public boost::noncopyable,
+                        public boost::enable_shared_from_this<TkcpConnection> {
         public:
         public:
-            TkcpSession(uint32_t conv,
-                        const InetAddress& localAddressForUdp,
+            TkcpConnection(uint32_t conv,
+                        const InetAddress& localUdpAddress,
+                        const InetAddress& peerUdpAddress,
                         const TcpConnectionPtr& tcpConnectionPtr,
                         const string& nameArg);
-            ~TkcpSession();
+            ~TkcpConnection();
 
-            EventLoop* GetLoop() const { return loop_; }
+            EventLoop* getLoop() const { return loop_; }
             bool Connected() const { return state_ == kConnected; }
             bool Disconnected() const { return state_ == kDisconnected; }
 
@@ -57,12 +60,12 @@ namespace net {
             boost::any* GetMutableContext() { return &context_; }
 
 
-            const InetAddress& localAddressForTcp() { return tcpConnectionPtr_->localAddress(); }
-            const InetAddress& LocalAddressForUdp() { return localAddressForUdp_; }
-            const InetAddress& peerAddressForUdp() { return peerAddressForUdp_; }
-            const InetAddress& peerAddressForTcp() { return tcpConnectionPtr_->peerAddress(); }
+            const InetAddress& localTcpAddress() { return tcpConnectionPtr_->localAddress(); }
+            const InetAddress& localUdpAddress() { return localUdpAddress_; }
+            const InetAddress& peerUdpAddress() { return peerUdpAddress_; }
+            const InetAddress& peerTcpAddress() { return tcpConnectionPtr_->peerAddress(); }
 
-            void InputUdpMessage(UdpMessagePtr& msg);
+            void InputUdpMessage(Buffer* buf, const InetAddress& peerAddress);
 
             void SyncUdpConnectionInfo();
             void onTcpConnection(const TcpConnectionPtr& conn);
@@ -131,8 +134,8 @@ namespace net {
             TcpConnectionPtr tcpConnectionPtr_;
             StateE state_;
 
-            InetAddress peerAddressForUdp_;
-            InetAddress localAddressForUdp_;
+            InetAddress peerUdpAddress_;
+            InetAddress localUdpAddress_;
             bool kcpInited_;
             ikcpcb* kcpcb_;
             Buffer kcpRecvBuf_;
@@ -166,7 +169,7 @@ namespace net {
     };
 
 
-    typedef boost::shared_ptr<TkcpSession> TkcpSessionPtr;
+    typedef boost::shared_ptr<TkcpConnection> TkcpConnectionPtr;
 
 }
 

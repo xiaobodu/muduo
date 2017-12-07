@@ -5,7 +5,7 @@
 #include <muduo/base/Timestamp.h>
 #include <muduo/net/Buffer.h>
 #include <muduo/net/EventLoop.h>
-#include <contrib/udp/UdpClientSocket.h>
+#include <muduo/net/udp/UdpClientSocket.h>
 #include <iostream>
 
 using namespace muduo;

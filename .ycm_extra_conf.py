@@ -69,6 +69,8 @@ flags = [
 "/usr/include/linux",
 '-I',
 '.',
+'-I',
+'./contrib',
 ]
 
 

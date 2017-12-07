@@ -45,7 +45,7 @@ class UdpClientSocket : boost::noncopyable, public  boost::enable_shared_from_th
             kDisconnectFailure = 1,
         };
 
-        typedef boost::function<void(const UdpClientSocketPtr&,Buffer*, Timestamp)> MessageCallback;
+        typedef boost::function<void(const UdpClientSocketPtr&, Buffer*, Timestamp)> MessageCallback;
         typedef boost::function<void(const UdpClientSocketPtr&, ConnectResult)> ConnectCallback;
         typedef boost::function<void(const UdpClientSocketPtr&, DisconnectResutl)> DisconnectCallback;
 
@@ -63,6 +63,8 @@ class UdpClientSocket : boost::noncopyable, public  boost::enable_shared_from_th
             char* Data;
             const size_t Size;
         };
+        UdpClientSocket(EventLoop* loop, const string& nameArg,
+                size_t maxPacketSize = KDefaultMaxPacketSize);
 
         static UdpClientSocketPtr MakeUdpClientSocket(EventLoop* loop, const string& nameArg,
                 size_t maxPacketSize = KDefaultMaxPacketSize);
@@ -111,8 +113,6 @@ class UdpClientSocket : boost::noncopyable, public  boost::enable_shared_from_th
             sendBufferSize_ = size;
         }
     private:
-        UdpClientSocket(EventLoop* loop, const string& nameArg,
-                size_t maxPacketSize = KDefaultMaxPacketSize);
         void connectInLoop(const InetAddress& address);
         void disconnectInLoop();
 

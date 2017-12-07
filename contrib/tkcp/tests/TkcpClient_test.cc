@@ -15,19 +15,19 @@ using namespace muduo::net;
 
 
 
-void OnMessage(const TkcpSessionPtr& conn, Buffer* buffer) {
+void OnMessage(const TkcpConnectionPtr& conn, Buffer* buffer) {
     string hello(buffer->peek(), buffer->readableBytes());
     LOG_DEBUG << "received " << hello;
     conn->Send(buffer);
     buffer->retrieveAll();
 }
 
-void sendMsg(const TkcpSessionPtr& conn) {
+void sendMsg(const TkcpConnectionPtr& conn) {
     char hello[] = "hello";
     conn->Send(hello, sizeof(hello));
 }
-void OnConnection(const TkcpSessionPtr& conn) {
-    conn->GetLoop()->runEvery(1/30.0, boost::bind(sendMsg, conn));
+void OnConnection(const TkcpConnectionPtr& conn) {
+    conn->getLoop()->runEvery(1/30.0, boost::bind(sendMsg, conn));
 }
 
 

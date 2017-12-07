@@ -148,7 +148,7 @@ struct SockaddrStorage {
 
 
             mutable boost::scoped_ptr<InetAddress> localAddress_;
-            mutable boost::scoped_ptr<InetAddress> remoteAddress_;
+            mutable boost::scoped_ptr<InetAddress> peerAddress_;
     };
 
 }

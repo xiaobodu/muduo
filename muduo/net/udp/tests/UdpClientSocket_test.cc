@@ -5,33 +5,33 @@
 #include <muduo/base/Timestamp.h>
 #include <muduo/net/Buffer.h>
 #include <muduo/net/EventLoop.h>
-#include <contrib/rudp/UdpClientSocket.h>
+#include <muduo/net/udp/UdpClientSocket.h>
 #include <iostream>
 
 using namespace muduo;
 using namespace muduo::net;
-using namespace muduo::net::rudp;
 
 
-UdpClientSocketPtr g_UdpClientSocket;
+
+
 
 int64_t g_BytesRead = 0; int64_t g_BytesWritten = 0;
 int64_t g_MessageRead = 0;
 Timestamp start;
 string g_Message;
 
-void MyMessageCallback(Buffer* buf, Timestamp) {
+void MyMessageCallback(const UdpClientSocketPtr& socket,  Buffer* buf, Timestamp) {
     g_MessageRead++;
     g_BytesRead += buf->readableBytes();
     g_BytesWritten += buf->readableBytes();
-    g_UdpClientSocket->Write(buf);
+    socket->Write(buf);
 }
 
-void MyConnectCallback(UdpClientSocket::ConnectResult result) {
+void MyConnectCallback(const UdpClientSocketPtr& socket, UdpClientSocket::ConnectResult result) {
     std::cout << "MyConnectCallback";
     if (result == UdpClientSocket::kConnectSuccess) {
         start = Timestamp::now();
-        g_UdpClientSocket->Write(g_Message.data(), g_Message.size());
+        socket->Write(g_Message.data(), g_Message.size());
     }
 }
 
@@ -42,7 +42,6 @@ void stop(EventLoop* loop) {
     auto now = Timestamp::now();
     std::cout << static_cast<double>(g_MessageRead) / timeDifference(now, start) << " PPS" << std::endl;
     std::cout << static_cast<double>(g_BytesRead) / (timeDifference(now, start) * 1024 * 1024) << " MiB/s throughput" << std::endl;
-    loop->quit();
 
 }
 
@@ -64,14 +63,14 @@ int main(int argc, char *argv[])
         Logger::setLogLevel(Logger::DEBUG);
         EventLoop loop;
 
-        g_UdpClientSocket = UdpClientSocket::MakeUdpClientSocket(&loop, "pingpong");
+        auto socket = UdpClientSocket::MakeUdpClientSocket(&loop, "pingpong");
 
-        g_UdpClientSocket->SetMessageCallback(MyMessageCallback);
-        g_UdpClientSocket->SetConnectCallback(MyConnectCallback);
+        socket->SetMessageCallback(MyMessageCallback);
+        socket->SetConnectCallback(MyConnectCallback);
 
 
-        g_UdpClientSocket->Connect(serverAddr);
-        loop.runAfter(60, boost::bind(stop, &loop));
+        socket->Connect(serverAddr);
+        loop.runEvery(15.0, boost::bind(stop, &loop));
 
         loop.loop();
     }

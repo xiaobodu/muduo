@@ -15,7 +15,7 @@
 #include <muduo/net/TcpServer.h>
 #include <boost/unordered_map.hpp>
 
-#include "TkcpSession.h"
+#include "TkcpConnection.h"
 #include "TkcpCallback.h"
 
 
@@ -24,19 +24,17 @@ namespace muduo {
 
 namespace net {
 
-class UdpService;
+class UdpServerSocket;
+typedef boost::shared_ptr<UdpServerSocket> UdpServerSocketPtr;
+
 class TkcpServer : public boost::noncopyable {
     public:
         TkcpServer(EventLoop* loop,
-                   const InetAddress& tcpListenAddr,
-                   const InetAddress& udpListenAddr,
-                   const InetAddress& outUdpListenAddr,
+                   const InetAddress& listenAddr,
                    const string& nameArg);
         ~TkcpServer();
 
-        const InetAddress& tcpListenAddress() const { return tcpListenAddress_; }
-        const InetAddress& udpListenAddress() const { return udpListenAddress_; }
-        const InetAddress& outUdpListenAddress() const { return outUdpListenAddress_; }
+        const InetAddress& listenAddress() const { return listenAddress_; }
 
         const string& name() const { return name_; }
         EventLoop* getLoop() const { return loop_; }
@@ -55,19 +53,18 @@ class TkcpServer : public boost::noncopyable {
     private:
         void newTcpConnection(const TcpConnectionPtr& conn);
 
-        void removeTckpSession(const TkcpSessionPtr& sess);
-        void removeTckpSessionInLoop(const TkcpSessionPtr& sess);
+        void removeTckpSession(const TkcpConnectionPtr& sess);
+        void removeTckpSessionInLoop(const TkcpConnectionPtr& sess);
 
-        void onUdpMessage(UdpMessagePtr& msg);
-        int outPutUdpMessage(const TkcpSessionPtr& sess, const char* buf, size_t len);
+        void onUdpMessage(const UdpServerSocketPtr& socket, Buffer* buf, Timestamp time,
+                                     const InetAddress& peerAddress);
+        int outPutUdpMessage(const TkcpConnectionPtr& sess, const char* buf, size_t len);
 
     private:
 
-    typedef boost::unordered_map<uint32_t, TkcpSessionPtr> SessionMap;
+    typedef boost::unordered_map<uint32_t, TkcpConnectionPtr> ConnectionMap;
     EventLoop* loop_;
-    const InetAddress tcpListenAddress_;
-    const InetAddress udpListenAddress_;
-    const InetAddress outUdpListenAddress_;
+    const InetAddress listenAddress_;
     const string name_;
 
     TkcpConnectionCallback tkcpConnectionCallback_;
@@ -76,9 +73,9 @@ class TkcpServer : public boost::noncopyable {
     AtomicInt32 started_;
 
     uint32_t nextConv_;
-    SessionMap sessions_;
+    ConnectionMap connections_;
 
-    boost::scoped_ptr<UdpService> udpService_;
+    UdpServerSocketPtr socket_;
     TcpServer tcpserver_;
 };
 

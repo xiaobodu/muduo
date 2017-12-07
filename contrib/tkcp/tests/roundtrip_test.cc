@@ -16,7 +16,7 @@ const size_t frameLen = 2*sizeof(int64_t);
 
 
 
-void ServerMessageCallback(const TkcpSessionPtr& sess,
+void ServerMessageCallback(const TkcpConnectionPtr& sess,
                            Buffer* buffer) {
 
     int64_t message[2];
@@ -37,9 +37,9 @@ void runServer(const char* ip, uint16_t port) {
 }
 
 
-TkcpSessionPtr clientsess;
+TkcpConnectionPtr clientsess;
 
-void ClientSessionCallback(const TkcpSessionPtr& sess) {
+void ClientSessionCallback(const TkcpConnectionPtr& sess) {
     if (sess->Connected()) {
         clientsess = sess;
     } else {
@@ -50,7 +50,7 @@ void ClientSessionCallback(const TkcpSessionPtr& sess) {
 
 int64_t total = 0;
 int64_t count = 0;
-void ClientMessageCallback(const TkcpSessionPtr&,
+void ClientMessageCallback(const TkcpConnectionPtr&,
                            Buffer* buffer) {
     int64_t message[2];
     memcpy(message, buffer->peek(), buffer->readableBytes());

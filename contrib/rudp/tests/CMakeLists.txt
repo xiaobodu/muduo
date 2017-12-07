@@ -1,7 +1,2 @@
-
-add_executable(UdpClientSocket_test UdpClientSocket_test.cc)
-target_link_libraries(UdpClientSocket_test muduo_net_rudp_cpp11)
-add_executable(UdpServerSocket_test UdpServerSocket_test.cc)
-target_link_libraries(UdpServerSocket_test muduo_net_rudp_cpp11)
 add_executable(ReliableUdpServer_test ReliableUdpServer_test.cc)
 target_link_libraries(ReliableUdpServer_test muduo_net_rudp_cpp11 boost_system boost_random jemalloc numa)
