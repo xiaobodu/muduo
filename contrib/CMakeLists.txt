@@ -13,3 +13,6 @@ endif()
 
 #add_subdirectory(tkcp)
 add_subdirectory(rudp)
+add_subdirectory(udp)
+add_subdirectory(kcp)
+add_subdirectory(kcpnet)
