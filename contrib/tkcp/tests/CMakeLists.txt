@@ -4,7 +4,9 @@ add_executable(UdpService_test UdpService_test.cc)
 target_link_libraries(UdpService_test muduo_net_tkcp11)
 add_executable(TkcpServer_test TkcpServer_test.cc)
 target_link_libraries(TkcpServer_test muduo_net_tkcp11
-		      #jemalloc
+		      jemalloc
+              #muduo_inspect
+			  #profiler
 		      )
 add_executable(TkcpClient_test TkcpClient_test.cc)
 target_link_libraries(TkcpClient_test muduo_net_tkcp11)

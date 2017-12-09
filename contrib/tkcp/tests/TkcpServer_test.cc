@@ -1,4 +1,10 @@
 
+
+//#include <muduo/net/EventLoopThread.h>
+//#include <muduo/net/inspect/Inspector.h>
+
+
+
 #include <stdio.h>
 
 #include <muduo/net/EventLoop.h>
@@ -7,14 +13,17 @@
 #include <contrib/tkcp/TkcpServer.h>
 #include <boost/bind.hpp>
 
+
+
 using namespace muduo;
 using namespace muduo::net;
 
 void OnConnection(const TkcpConnectionPtr& sess) {
-    LOG_DEBUG << "New TkcpConn";
+    LOG_INFO << "New TkcpConn ";
 }
 
 void OnMessage(const TkcpConnectionPtr& sess, Buffer* buffer) {
+    LOG_DEBUG << buffer->toStringPiece().as_string();
     sess->Send(buffer);
 }
 
@@ -25,28 +34,25 @@ void Stop(EventLoop* loop) {
 
 int main(int argc, char* argv[])
 {
-    if (argc < 4) {
-        printf("arg err Usage: ip tcpport udpport\n");
+    if (argc < 3) {
+        printf("arg err Usage: ip port\n");
         return 1;
     }
-    //ProfilerStart("Test");
-    Logger::setLogLevel(Logger::DEBUG);
-    InetAddress tcpAddr(argv[1], static_cast<uint16_t>(atoi(argv[2])));
-    InetAddress udpaddr(argv[1], static_cast<uint16_t>(atoi(argv[3])));
-
+    Logger::setLogLevel(Logger::INFO);
+    InetAddress listenAddress(argv[1], static_cast<uint16_t>(atoi(argv[2])));
+    //EventLoopThread t;
+    //Inspector ins(t.startLoop(), InetAddress(12345), "PingPong");
 
     EventLoop loop;
 
-    TkcpServer server(&loop, tcpAddr, udpaddr, udpaddr, "test");
+    TkcpServer server(&loop, listenAddress, "test");
     server.SetTkcpConnectionCallback(OnConnection);
     server.SetTkcpMessageCallback(OnMessage);
 
-    //loop.runAfter(600, boost::bind(Stop, &loop));
 
     server.Start();
 
     loop.loop();
 
-    //ProfilerStop();
     return 0;
 }

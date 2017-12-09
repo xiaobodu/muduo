@@ -8,23 +8,21 @@
 #include <vector>
 
 #include <contrib/tkcp/TkcpClient.h>
+#include <muduo/base/CurrentThread.h>
 
 
 using namespace muduo;
 using namespace muduo::net;
 
-
+string g_Message;
 
 void OnMessage(const TkcpConnectionPtr& conn, Buffer* buffer) {
-    string hello(buffer->peek(), buffer->readableBytes());
-    LOG_DEBUG << "received " << hello;
-    conn->Send(buffer);
+    LOG_DEBUG << buffer->toStringPiece().as_string();
     buffer->retrieveAll();
 }
 
 void sendMsg(const TkcpConnectionPtr& conn) {
-    char hello[] = "hello";
-    conn->Send(hello, sizeof(hello));
+    conn->Send(g_Message);
 }
 void OnConnection(const TkcpConnectionPtr& conn) {
     conn->getLoop()->runEvery(1/30.0, boost::bind(sendMsg, conn));
@@ -34,23 +32,29 @@ void OnConnection(const TkcpConnectionPtr& conn) {
 
 int main(int argc, char* argv[])
 {
-    if (argc < 4) {
-        printf("arg error usage: ip port n\n");
+    if (argc < 5) {
+        printf("arg error usage: ip port clientnum packetsize\n");
         return 1;
     }
 
-    Logger::setLogLevel(Logger::DEBUG);
+    Logger::setLogLevel(Logger::INFO);
 
     std::vector<TkcpClientPtr> clients;
     EventLoop loop;
     InetAddress serverAddr(argv[1], static_cast<uint16_t>(atoi(argv[2])));
-    int n = atoi(argv[3]);
+    int clientnum  = atoi(argv[3]);
+    int packetsize = atoi(argv[4]);
 
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < packetsize; ++i) {
+        g_Message.push_back(static_cast<char>(i % 128));
+    }
+
+    for (int i = 0; i < clientnum; ++i) {
         TkcpClientPtr client(new TkcpClient(&loop, serverAddr, "test"));
-        client->SetTkcpMessageCallback(OnMessage);
-        client->SetTkcpConnectionCallback(OnConnection);
+        client->SetMessageCallback(OnMessage);
+        client->SetConnectionCallback(OnConnection);
         client->Connect();
+        CurrentThread::sleepUsec(12*1000); 
         clients.push_back(client);
     }
 

@@ -30,7 +30,7 @@ void ServerMessageCallback(const TkcpConnectionPtr& sess,
 
 void runServer(const char* ip, uint16_t port) {
     EventLoop loop;
-    TkcpServer server(&loop, InetAddress(ip, port), InetAddress(ip, static_cast<uint16_t>(port+1)), InetAddress(ip, static_cast<uint16_t>(port+1)), "clockSever");
+    TkcpServer server(&loop, InetAddress(ip, port), "clockSever");
     server.SetTkcpMessageCallback(ServerMessageCallback);
     server.Start();
     loop.loop();
@@ -82,8 +82,8 @@ void sendMyTime() {
 void runClient(const char* ip, uint16_t port) {
     EventLoop loop;
     TkcpClient client(&loop, InetAddress(ip, port), "clockClient");
-    client.SetTkcpConnectionCallback(ClientSessionCallback);
-    client.SetTkcpMessageCallback(ClientMessageCallback);
+    client.SetConnectionCallback(ClientSessionCallback);
+    client.SetMessageCallback(ClientMessageCallback);
     client.Connect();
     loop.runEvery(0.2, sendMyTime);
     loop.loop();

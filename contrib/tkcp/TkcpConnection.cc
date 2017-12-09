@@ -21,6 +21,7 @@ namespace net {
 
 
 
+
 const int kMicroSecondsPerMillissecond = 1000;
 const int kMillissecondsPerSecond = 1000;
 static double MillisecondToSecond(int millisecond) {
@@ -64,7 +65,7 @@ TkcpConnection::TkcpConnection(uint32_t conv,
       kcpRecvBuf_(2048),
       trySendConnectSynTimes(0),
       udpAvailble_(true),
-      nextKcpUpdateTime_(0) {
+      kcpState_(0){
 
     fec_.reset(new Fec());
     fec_->setSendOutCallback(boost::bind(&TkcpConnection::onFecSendData, this, _1, _2));
@@ -98,6 +99,7 @@ const char* TkcpConnection::stateToString() const {
             return "unknown state";
     }
 }
+
 
 void TkcpConnection::Send(const void* data, int len) {
     Send(StringPiece(static_cast<const char*>(data), len));
@@ -149,7 +151,9 @@ void TkcpConnection::SendInLoop(const void *data, size_t len) {
 
 void TkcpConnection::sendKcpMsg(const void *data, size_t len) {
     ikcp_send(kcpcb_, static_cast<const char*>(data), static_cast<int>(len));
-    ikcp_flush(kcpcb_);
+    if (!(kcpState_ & KcpStateE::kUpdating)) {
+        postImmediatelyUpdateKcp();
+    }
 }
 
 void TkcpConnection::sendTcpMsg(const void *data, size_t len) {
@@ -158,7 +162,6 @@ void TkcpConnection::sendTcpMsg(const void *data, size_t len) {
     EncodeUint8(&sendBuf, packet::tcp::kData);
     sendBuf.append(data, len);
     tcpConnectionPtr_->send(&sendBuf);
-
 }
 
 
@@ -203,7 +206,7 @@ void TkcpConnection::InputUdpMessage(Buffer* buf, const InetAddress& peerAddress
     peerUdpAddress_ = peerAddress;
     uint32_t conv = DecodeUint32(buf);
     uint8_t packeId = DecodeUint8(buf);
-    LOG_DEBUG << "recv " << packet::udp::PacketIdToString(packeId) <<
+    LOG_TRACE << "recv " << packet::udp::PacketIdToString(packeId) <<
                  " udpmsg from conv " << conv;
     switch (packeId) {
         case packet::udp::kData:
@@ -248,13 +251,7 @@ void TkcpConnection::onConnectSyncAck() {
     }
 }
 
-void TkcpConnection::kcpUpdate() {
-    uint32_t now =  TimestampToMillisecond(loop_->pollReturnTime());
-    if (now > nextKcpUpdateTime_) {
-        ikcp_update(kcpcb_, now);
-        nextKcpUpdateTime_ = ikcp_check(kcpcb_, now);
-    }
-}
+
 
 
 void TkcpConnection::initKcp() {
@@ -264,13 +261,14 @@ void TkcpConnection::initKcp() {
     kcpInited_ = true;
     kcpcb_  = ikcp_create(conv_, this);
     ikcp_setoutput(kcpcb_, kcpOutput);
-    ikcp_nodelay(kcpcb_, 1, 30, 2, 1);
+    ikcp_nodelay(kcpcb_, 1, 200, 2, 1);
     ikcp_wndsize(kcpcb_, 128, 128);
     ikcp_setmtu(kcpcb_, (576 - 20 - 8 - packet::udp::kPacketHeadLength - 3 * Fec::FecHeadLen)/3);
-    kcpcb_->rx_minrto = 10;
 
-    kcpUpdateTimer_ = loop_->runEvery(MillisecondToSecond(30),
-                    boost::bind(&TkcpConnection::kcpUpdate, this));
+
+    nextKcpTime_ = ikcp_update(kcpcb_, TimestampToMillisecond(Timestamp::now()));
+    updateKcpTimer_ = loop_->runEvery(MillisecondToSecond(50),
+                    boost::bind(&TkcpConnection::onUpdateKcp, this));
 
     setState(kConnected);
     tkcpConnectionCallback_(shared_from_this());
@@ -306,16 +304,7 @@ void TkcpConnection::onUdpData(const char* buf, size_t len) {
 
 void TkcpConnection::onFecRecvData(const char* data, size_t len) {
     ikcp_input(kcpcb_, data, static_cast<int>(len));
-    int size = ikcp_peeksize(kcpcb_);
-    if (size > 0) {
-
-        int nr = ikcp_recv(kcpcb_, kcpRecvBuf_.beginWrite(), static_cast<int>(kcpRecvBuf_.writableBytes()));
-        assert(size == nr);
-        kcpRecvBuf_.hasWritten(nr);
-        tkcpMessageCallback_(shared_from_this(), &kcpRecvBuf_);
-        kcpRecvBuf_.retrieveAll();
-    }
-    ikcp_flush(kcpcb_);
+    immediatelyUpdateKcp();
 }
 
 
@@ -341,7 +330,7 @@ void TkcpConnection::onTcpConnection(const TcpConnectionPtr& conn) {
 
         loop_->cancel(udpPingTimer_);
         loop_->cancel(tcpPingTimer_);
-        loop_->cancel(kcpUpdateTimer_);
+        loop_->cancel(updateKcpTimer_);
 
         TkcpConnectionPtr guardThis(shared_from_this());
         tkcpConnectionCallback_(guardThis);
@@ -475,7 +464,7 @@ void TkcpConnection::ConnectDestroyed() {
 
         loop_->cancel(udpPingTimer_);
         loop_->cancel(tcpPingTimer_);
-        loop_->cancel(kcpUpdateTimer_);
+        loop_->cancel(updateKcpTimer_ );
 
         setState(kDisconnected);
         tkcpConnectionCallback_(shared_from_this());
@@ -505,10 +494,74 @@ void TkcpConnection::Close() {
     forceClose();
 }
 
+/*
+            onUpdateKcp();
+            void immediatelyUpdateKcp();
+            void immediatelyUpdateKcp(uint32_t now);
+            void postImmediatelyUpdateKcp();
+            void updateKcp(uint32_t now, bool fromeTimer);
+
+    int nr = ikcp_recv(kcpcb_, kcpRecvBuf_.beginWrite(), static_cast<int>(kcpRecvBuf_.writableBytes()));
+    if (nr > 0) {
+        kcpRecvBuf_.hasWritten(nr);
+        tkcpMessageCallback_(shared_from_this(), &kcpRecvBuf_);
+        kcpRecvBuf_.retrieveAll();
+    } else if (nr == -3) {
+        int size = ikcp_peeksize(kcpcb_);
+        kcpRecvBuf_.ensureWritableBytes(static_cast<size_t>(size));
+        nr = ikcp_recv(kcpcb_, kcpRecvBuf_.beginWrite(), static_cast<int>(kcpRecvBuf_.writableBytes()));
+        if (nr > 0) {
+            kcpRecvBuf_.hasWritten(nr);
+            tkcpMessageCallback_(shared_from_this(), &kcpRecvBuf_);
+            kcpRecvBuf_.retrieveAll();
+        }
+    }
+*/
+
+
+void TkcpConnection::onUpdateKcp() {
+    uint32_t current = TimestampToMillisecond(Timestamp::now());
+    if (current > nextKcpTime_) {
+        updateKcp(current);
+    }
+}
+void TkcpConnection::immediatelyUpdateKcp() {
+    uint32_t current =TimestampToMillisecond(Timestamp::now());
+    immediatelyUpdateKcp(current);
+}
+
+void TkcpConnection::immediatelyUpdateKcp(uint32_t current) {
+    kcpState_ &= ~KcpStateE::kPosting;
+    updateKcp(current);
+}
+
+void TkcpConnection::postImmediatelyUpdateKcp() {
+    if (!(kcpState_ & KcpStateE::kPosting)) {
+        kcpState_ |= KcpStateE::kPosting;
+        loop_->queueInLoop(boost::bind(&TkcpConnection::immediatelyUpdateKcp, shared_from_this()));
+    }
+}
+
+void TkcpConnection::updateKcp(uint32_t current) {
+    kcpState_ |= KcpStateE::kUpdating;
+    int nr = 0;
+    while (nr != -1) {
+        nr = ikcp_recv(kcpcb_, kcpRecvBuf_.beginWrite(), static_cast<int>(kcpRecvBuf_.writableBytes()));
+        if (nr > 0) {
+            kcpRecvBuf_.hasWritten(nr);
+            tkcpMessageCallback_(shared_from_this(), &kcpRecvBuf_);
+            kcpRecvBuf_.retrieveAll();
+        } else {
+            int size = ikcp_peeksize(kcpcb_);
+            kcpRecvBuf_.ensureWritableBytes(static_cast<size_t>(size));
+        }
+    }
+    kcpState_ &= ~KcpStateE::kUpdating;
+
+    nextKcpTime_ = ikcp_update(kcpcb_, current);
+}
+
 }
 }
-
-
-
 
 

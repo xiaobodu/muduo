@@ -43,14 +43,14 @@ class TkcpClient : public boost::noncopyable {
         EventLoop* getLoop() const { return loop_; }
         const string& name() const { return name_; }
 
-        TkcpConnectionPtr conn() const { return kcpConn_; }
+        TkcpConnectionPtr conn() const { return conn_; }
 
-        void SetTkcpConnectionCallback(const TkcpConnectionCallback& cb) {
-            tkcpConnectionCallback_ = cb;
+        void SetConnectionCallback(const TkcpConnectionCallback& cb) {
+            connectionCallback_ = cb;
         }
 
-        void SetTkcpMessageCallback(const TkcpMessageCallback& cb) {
-            tkcpMessageCallback_ = cb ;
+        void SetMessageCallback(const TkcpMessageCallback& cb) {
+            messageCallback_ = cb ;
         }
 
 
@@ -58,27 +58,27 @@ class TkcpClient : public boost::noncopyable {
     public:
     private:
         void newTcpConnection(const TcpConnectionPtr& conn);
-        void removeTckpconnion(const TkcpConnectionPtr& conn);
+        void removeTckpconnection(const TkcpConnectionPtr& conn);
+        int outputUdpMessage(const TkcpConnectionPtr& conn, const char* buf, size_t len);
 
     private:
 
-        void udpMessageCallback(const UdpClientSocketPtr& socket, Buffer* buf, Timestamp) ;
-        void udpConnectCallback(const UdpClientSocketPtr& socket, UdpClientSocket::ConnectResult result) ;
-        void udpDisconnectCallback(const UdpClientSocketPtr& socket, UdpClientSocket::DisconnectResutl result);
-
+        void onUdpMessage(const UdpClientSocketPtr& socket, Buffer* buf, Timestamp) ;
+        void onUdpConnect(const UdpClientSocketPtr& socket, UdpClientSocket::ConnectResult result) ;
+        void onUdpDisconnect(const UdpClientSocketPtr& socket, UdpClientSocket::DisconnectResutl result);
 
     private:
         muduo::net::EventLoop* loop_;
         const string name_;
         InetAddress peerAddress_;
 
-        TkcpConnectionCallback tkcpConnectionCallback_;
-        TkcpMessageCallback tkcpMessageCallback_;
+        TkcpConnectionCallback connectionCallback_;
+        TkcpMessageCallback messageCallback_;
 
 
 
         TcpClient tcpClient_;
-        TkcpConnectionPtr kcpConn_;
+        TkcpConnectionPtr conn_;
 
         UdpClientSocketPtr socket_;
 };

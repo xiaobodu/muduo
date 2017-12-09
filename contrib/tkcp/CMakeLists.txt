@@ -8,14 +8,15 @@ set(tkcp_SRCS
     Packet.cc
     TkcpClient.cc
     Fec.cc
+    ikcp.c
     )
 
 
 add_library(muduo_net_tkcp ${tkcp_SRCS})
-target_link_libraries(muduo_net_tkcp muduo_net muduo_net_kcp profiler)
+target_link_libraries(muduo_net_tkcp muduo_net_udp muduo_net)
 
 add_library(muduo_net_tkcp11 ${tkcp_SRCS})
-target_link_libraries(muduo_net_tkcp11 muduo_net_cpp11 muduo_net_kcp profiler)
+target_link_libraries(muduo_net_tkcp11 muduo_net_udp_cpp11 muduo_net_cpp11)
 set_target_properties(muduo_net_tkcp11 PROPERTIES COMPILE_FLAGS "-std=c++0x")
 
 
@@ -34,7 +35,7 @@ set(HEADERS
 install(FILES ${HEADERS} DESTINATION include/muduo/net/tkcp)
 
 
-#add_subdirectory(tests)
+add_subdirectory(tests)
 
 
 

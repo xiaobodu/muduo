@@ -14,7 +14,7 @@
 #include <muduo/net/Buffer.h>
 #include <muduo/net/InetAddress.h>
 
-#include <kcp/ikcp.h>
+#include "ikcp.h"
 #include "TkcpCallback.h"
 
 
@@ -24,8 +24,6 @@ namespace muduo {
 
 namespace net {
     class Fec;
-    class UdpMessage;
-    typedef boost::shared_ptr<UdpMessage> UdpMessagePtr;
     typedef boost::function<int(const TkcpConnectionPtr&, const char *, size_t)> UdpOutputCallback;
     class TkcpConnection : public boost::noncopyable,
                         public boost::enable_shared_from_this<TkcpConnection> {
@@ -76,8 +74,7 @@ namespace net {
             void Close();
 
         private:
-
-
+        
             void SendInLoop(const StringPiece& message);
             void SendInLoop(const void *message, size_t len);
             //for udp begin
@@ -87,7 +84,12 @@ namespace net {
             void onPingRequest();
             void onPingReply();
             void initKcp();
-            void kcpUpdate();
+            void onUpdateKcp();
+            void immediatelyUpdateKcp();
+            void immediatelyUpdateKcp(uint32_t current);
+            void postImmediatelyUpdateKcp();
+            void updateKcp(uint32_t current);
+
             void sendKcpMsg(const void *data, size_t len);
             void onUdpData(const char* buf, size_t len);
             void onFecRecvData(const char* data, size_t len);
@@ -118,6 +120,12 @@ namespace net {
                           kDisconnecting,
                           kDisconnected,
             };
+
+            enum KcpStateE {
+                kUpdating = 0x1,
+                kPosting  = 0x2,
+            };
+
             const char* stateToString() const;
 
         private:
@@ -154,9 +162,11 @@ namespace net {
             int trySendConnectSynTimes;
             bool udpAvailble_;
 
+            uint32_t kcpState_;
+            TimerId updateKcpTimer_;
+            uint32_t nextKcpTime_;
 
-            TimerId kcpUpdateTimer_;
-            uint32_t nextKcpUpdateTime_;
+
             TimerId udpPingTimer_;
 
             TimerId tcpPingTimer_;
