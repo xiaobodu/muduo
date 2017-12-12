@@ -12,9 +12,8 @@
 #include "TkcpConnection.h"
 #include "Packet.h"
 #include "Coding.h"
-#include "UdpMessage.h"
 #include "Fec.h"
-
+#include "ikcp.h"
 namespace muduo {
 
 namespace net {
@@ -51,11 +50,13 @@ TkcpConnection::TkcpConnection(uint32_t conv,
         const InetAddress& localUdpAddress,
         const InetAddress& peerUdpAddress,
         const TcpConnectionPtr& tcpConnectionPtr,
-        const string& nameArg)
+        const string& nameArg,
+        const int redundant)
     :
       loop_(tcpConnectionPtr->getLoop()),
       conv_(conv),
       name_(nameArg),
+      redundant_(redundant),
       tcpConnectionPtr_(tcpConnectionPtr),
       state_(kTcpConnected),
       peerUdpAddress_(peerUdpAddress),
@@ -67,7 +68,7 @@ TkcpConnection::TkcpConnection(uint32_t conv,
       udpAvailble_(true),
       kcpState_(0){
 
-    fec_.reset(new Fec());
+    fec_.reset(new Fec(redundant));
     fec_->setSendOutCallback(boost::bind(&TkcpConnection::onFecSendData, this, _1, _2));
     fec_->setRecvOutCallback(boost::bind(&TkcpConnection::onFecRecvData, this, _1, _2));
 
@@ -263,7 +264,7 @@ void TkcpConnection::initKcp() {
     ikcp_setoutput(kcpcb_, kcpOutput);
     ikcp_nodelay(kcpcb_, 1, 200, 2, 1);
     ikcp_wndsize(kcpcb_, 128, 128);
-    ikcp_setmtu(kcpcb_, (576 - 20 - 8 - packet::udp::kPacketHeadLength - 3 * Fec::FecHeadLen)/3);
+    ikcp_setmtu(kcpcb_, fec_->Mtu());
 
 
     nextKcpTime_ = ikcp_update(kcpcb_, TimestampToMillisecond(Timestamp::now()));
@@ -544,9 +545,8 @@ void TkcpConnection::postImmediatelyUpdateKcp() {
 
 void TkcpConnection::updateKcp(uint32_t current) {
     kcpState_ |= KcpStateE::kUpdating;
-    int nr = 0;
+    int nr = ikcp_recv(kcpcb_, kcpRecvBuf_.beginWrite(), static_cast<int>(kcpRecvBuf_.writableBytes()));;
     while (nr != -1) {
-        nr = ikcp_recv(kcpcb_, kcpRecvBuf_.beginWrite(), static_cast<int>(kcpRecvBuf_.writableBytes()));
         if (nr > 0) {
             kcpRecvBuf_.hasWritten(nr);
             tkcpMessageCallback_(shared_from_this(), &kcpRecvBuf_);
@@ -555,6 +555,7 @@ void TkcpConnection::updateKcp(uint32_t current) {
             int size = ikcp_peeksize(kcpcb_);
             kcpRecvBuf_.ensureWritableBytes(static_cast<size_t>(size));
         }
+        nr = ikcp_recv(kcpcb_, kcpRecvBuf_.beginWrite(), static_cast<int>(kcpRecvBuf_.writableBytes()));
     }
     kcpState_ &= ~KcpStateE::kUpdating;
 

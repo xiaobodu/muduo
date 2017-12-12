@@ -1,7 +1,4 @@
 set(tkcp_SRCS
-    UdpMessage.cc
-    UdpService.cc
-    UdpSocket.cc
     TkcpConnection.cc
     TkcpServer.cc
     Coding.cc
@@ -33,7 +30,6 @@ set(HEADERS
 
 
 install(FILES ${HEADERS} DESTINATION include/muduo/net/tkcp)
-
 
 add_subdirectory(tests)
 

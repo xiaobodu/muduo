@@ -18,10 +18,12 @@ namespace net {
 
 TkcpServer::TkcpServer(EventLoop* loop,
                        const InetAddress& listenAddress,
-                       const string& nameArg)
+                       const string& nameArg,
+                       const int redundant)
     : loop_(CHECK_NOTNULL(loop)),
       listenAddress_(listenAddress),
       name_(nameArg),
+      redundant_(redundant),
       tkcpConnectionCallback_(defaultTkcpConnectionCallback),
       tkcpMessageCallback_(defaultTkcpMessageCallback),
       nextConv_(1),
@@ -65,7 +67,7 @@ void TkcpServer::newTcpConnection(const TcpConnectionPtr& conn) {
                  << "] - new sess [" << sessName
                  << "]";
         conn->setTcpNoDelay(true);
-        TkcpConnectionPtr sess = TkcpConnectionPtr(new TkcpConnection(conv, listenAddress_, InetAddress(), conn, sessName));
+        TkcpConnectionPtr sess = TkcpConnectionPtr(new TkcpConnection(conv, listenAddress_, InetAddress(), conn, sessName, redundant_));
         conn->setConnectionCallback(boost::bind(&TkcpConnection::onTcpConnection, sess, _1));
         conn->setMessageCallback(boost::bind(&TkcpConnection::onTcpMessage, sess, _1, _2, _3));
 

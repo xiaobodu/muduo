@@ -22,10 +22,12 @@ namespace net {
 
 TkcpClient::TkcpClient(EventLoop* loop,
                             const InetAddress& peerAddress,
-                            const string& nameArg)
+                            const string& nameArg,
+                            const int redundant)
     : loop_(CHECK_NOTNULL(loop)),
       name_(nameArg),
       peerAddress_(peerAddress),
+      redundant_(redundant),
       tcpClient_(loop_, peerAddress, nameArg),
       socket_(new UdpClientSocket(loop_, "tkcp")){
     tcpClient_.setConnectionCallback(boost::bind(&TkcpClient::newTcpConnection, this, _1));
@@ -68,7 +70,7 @@ void TkcpClient::newTcpConnection(const TcpConnectionPtr& conn) {
     if (conn->connected()) {
         InetAddress localUdpAddress;
         socket_->LocalAddress(&localUdpAddress);
-        conn_.reset(new TkcpConnection(0, localUdpAddress, peerAddress_, conn, name_ + ":client"));
+        conn_.reset(new TkcpConnection(0, localUdpAddress, peerAddress_, conn, name_ + ":client", redundant_));
         conn->setConnectionCallback(boost::bind(&TkcpConnection::onTcpConnection, conn_, _1));
         conn->setMessageCallback(boost::bind(&TkcpConnection::onTcpMessage, conn_, _1, _2, _3));
 

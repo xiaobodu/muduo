@@ -31,7 +31,8 @@ class TkcpServer : public boost::noncopyable {
     public:
         TkcpServer(EventLoop* loop,
                    const InetAddress& listenAddr,
-                   const string& nameArg);
+                   const string& nameArg,
+                   const int redundant = 0);
         ~TkcpServer();
 
         const InetAddress& listenAddress() const { return listenAddress_; }
@@ -66,6 +67,7 @@ class TkcpServer : public boost::noncopyable {
     EventLoop* loop_;
     const InetAddress listenAddress_;
     const string name_;
+    int redundant_;
 
     TkcpConnectionCallback tkcpConnectionCallback_;
     TkcpMessageCallback tkcpMessageCallback_;

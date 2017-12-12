@@ -34,7 +34,8 @@ class TkcpClient : public boost::noncopyable {
     public:
         TkcpClient(EventLoop* loop,
                    const InetAddress& peerAddress,
-                   const string& nameArg);
+                   const string& nameArg,
+                   const int redundant = 0);
         ~TkcpClient();
 
         void Connect();
@@ -71,6 +72,7 @@ class TkcpClient : public boost::noncopyable {
         muduo::net::EventLoop* loop_;
         const string name_;
         InetAddress peerAddress_;
+        int redundant_;
 
         TkcpConnectionCallback connectionCallback_;
         TkcpMessageCallback messageCallback_;

@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
     }
 
     for (int i = 0; i < clientnum; ++i) {
-        TkcpClientPtr client(new TkcpClient(&loop, serverAddr, "test"));
+        TkcpClientPtr client(new TkcpClient(&loop, serverAddr, "test", 2));
         client->SetMessageCallback(OnMessage);
         client->SetConnectionCallback(OnConnection);
         client->Connect();

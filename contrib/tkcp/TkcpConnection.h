@@ -14,12 +14,12 @@
 #include <muduo/net/Buffer.h>
 #include <muduo/net/InetAddress.h>
 
-#include "ikcp.h"
+
 #include "TkcpCallback.h"
 
 
 
-
+struct IKCPCB;
 namespace muduo {
 
 namespace net {
@@ -33,7 +33,7 @@ namespace net {
                         const InetAddress& localUdpAddress,
                         const InetAddress& peerUdpAddress,
                         const TcpConnectionPtr& tcpConnectionPtr,
-                        const string& nameArg);
+                        const string& nameArg, const int redundant_ = 0);
             ~TkcpConnection();
 
             EventLoop* getLoop() const { return loop_; }
@@ -138,6 +138,7 @@ namespace net {
             EventLoop* loop_;
             uint32_t conv_;
             string name_;
+            int redundant_;
 
             TcpConnectionPtr tcpConnectionPtr_;
             StateE state_;
@@ -145,7 +146,7 @@ namespace net {
             InetAddress peerUdpAddress_;
             InetAddress localUdpAddress_;
             bool kcpInited_;
-            ikcpcb* kcpcb_;
+            struct IKCPCB* kcpcb_;
             Buffer kcpRecvBuf_;
             boost::shared_ptr<Fec> fec_;
             Buffer udpSendBuf_;

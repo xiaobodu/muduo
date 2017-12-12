@@ -5,6 +5,7 @@
 
 #include <boost/unordered_set.hpp>
 #include <boost/function.hpp>
+#include <vector>
 
 #include <muduo/net/Buffer.h>
 
@@ -14,24 +15,25 @@ namespace net {
 typedef boost::function<void(const char*, size_t)> FecOutCallback;
 class Fec {
     private:
-        uint32_t sendSeq_;
-        const static uint32_t ReceivedSeqsLen = 128;
-        uint32_t receivedSeqs_[ReceivedSeqsLen];
+        int redundant_;
+        uint16_t sendSeq_;
+        const static uint32_t ReceivedSeqsLen = 256;
+        uint16_t receivedSeqs_[ReceivedSeqsLen];
 
 
         FecOutCallback sendOutCallback_;
         FecOutCallback recvOutCallback_;
-        Buffer oneSendBuf_;
-        Buffer secondSendBuf_;
-        Buffer thirdSendBuf_;
-        Buffer sendTotalBuf_;
         Buffer inputBuf_;
+
+        std::vector<Buffer> sendBuffers_;
+        Buffer outBuffer_;
     private:
 
     public:
-        const static size_t FecHeadLen = sizeof(uint32_t) + sizeof(uint16_t);
+        const static int FecHeadLen = sizeof(uint16_t) + sizeof(uint16_t);
     public:
-        Fec();
+        Fec(int redundant = 0);
+        int Mtu();
         void Send(const char* data, size_t size);
         void Input(const char* data, size_t size);
         void setSendOutCallback(const FecOutCallback& cb) { sendOutCallback_ = cb; }

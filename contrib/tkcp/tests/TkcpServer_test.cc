@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
 
     EventLoop loop;
 
-    TkcpServer server(&loop, listenAddress, "test");
+    TkcpServer server(&loop, listenAddress, "test",2);
     server.SetTkcpConnectionCallback(OnConnection);
     server.SetTkcpMessageCallback(OnMessage);
 
