@@ -1151,7 +1151,7 @@ IUINT32 ikcp_update(ikcpcb *kcp, IUINT32 current)
 		slap = 0;
 	}
 
-	if (slap >= 0) {
+	if (slap >= 0 || !iqueue_is_empty(&kcp->snd_queue)) {
 		kcp->ts_flush += kcp->interval;
 		if (_itimediff(kcp->current, kcp->ts_flush) >= 0) {
 			kcp->ts_flush = kcp->current + kcp->interval;
