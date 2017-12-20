@@ -23,7 +23,7 @@ int Fec::Mtu() {
     if (redundant_ <= 0) {
         return UDP_MIN_MTU - packet::udp::kPacketHeadLength;
     } else {
-        return (UDP_MIN_MTU - packet::udp::kPacketHeadLength)/(redundant_+1) - FecHeadLen;
+        return (UDP_MIN_MTU - packet::udp::kPacketHeadLength - (redundant_+1)*FecHeadLen) / (redundant_+1);
     }
 }
 void Fec::Send(const char* data, size_t size) {
@@ -37,11 +37,11 @@ void Fec::Send(const char* data, size_t size) {
         EncodeUint16(&sendBuffers_[sendBuffers_.size()-1], sendSeq_++);
         EncodeUint16(&sendBuffers_[sendBuffers_.size()-1], static_cast<uint16_t>(size));
         sendBuffers_[sendBuffers_.size()-1].append(data, size);
+        outBuffer_.retrieveAll();
         for (std::vector<Buffer>::size_type i = 0; i < sendBuffers_.size(); ++i) {
             outBuffer_.append(sendBuffers_[i].peek(), sendBuffers_[i].readableBytes());
         }
         sendOutCallback_(outBuffer_.peek(), outBuffer_.readableBytes());
-        outBuffer_.retrieveAll();
     } else {
         sendOutCallback_(data, size);
     }

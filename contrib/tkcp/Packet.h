@@ -31,7 +31,7 @@ struct TcpPacketHead {
 enum TcpPacketId {
     kUdpConnectionInfo = 1,
     kData = 2,
-    KUseTcp = 3,
+    KTransportMode = 3,
     kPingRequest = 4,
     kPingReply = 5,
 };
@@ -39,6 +39,17 @@ enum TcpPacketId {
 
 struct UdpConnectionInfo : public TcpPacketHead {
     uint32_t conv;
+    void Encode(Buffer* buf);
+    void Decode(Buffer* buf);
+    size_t Size();
+};
+
+struct TransportMode : public TcpPacketHead {
+    enum ModeE {
+        KTcp = 0,
+        kUdp = 1,
+    };
+    uint8_t mode;
     void Encode(Buffer* buf);
     void Decode(Buffer* buf);
     size_t Size();

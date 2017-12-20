@@ -233,9 +233,6 @@ void TkcpConnection::InputUdpMessage(Buffer* buf, const InetAddress& peerAddress
 }
 
 void TkcpConnection::onConnectSyn() {
-    if (!kcpInited_) {
-        initKcp();
-    }
     Buffer sendbuf(8);
     EncodeUint32(&sendbuf, conv_);
     EncodeUint8(&sendbuf, packet::udp::kConnectSynAck);
@@ -244,12 +241,20 @@ void TkcpConnection::onConnectSyn() {
 }
 
 void TkcpConnection::onConnectSyncAck() {
-    if (!kcpInited_) {
-        assert(state_ == kUdpConnectSynSend);
-        initKcp(); // client
-        udpPingTimer_ = loop_->runEvery(60, boost::bind(&TkcpConnection::udpPingRequest, this));
-        tcpPingTimer_ = loop_->runAfter(120, boost::bind(&TkcpConnection::tcpPingRequest, this));
+     if (state_ != kUdpConnectSynSend) {
+        return;
     }
+    initKcp(); // client
+    udpPingTimer_ = loop_->runEvery(60, boost::bind(&TkcpConnection::udpPingRequest, this));
+    tcpPingTimer_ = loop_->runAfter(120, boost::bind(&TkcpConnection::tcpPingRequest, this));
+    Buffer sendbuf;
+    packet::tcp::TransportMode mode;
+    mode.packetId = packet::tcp::TcpPacketId::KTransportMode;
+    mode.mode = packet::tcp::TransportMode::kUdp;
+    mode.Encode(&sendbuf);
+    tcpConnectionPtr_->send(&sendbuf);
+    setState(kConnected);
+    tkcpConnectionCallback_(shared_from_this());
 }
 
 
@@ -257,9 +262,9 @@ void TkcpConnection::onConnectSyncAck() {
 
 void TkcpConnection::initKcp() {
     assert(kcpcb_ == NULL);
-    assert(kcpInited_ == false);
+
     assert(state_ == kTcpConnected || state_ == kUdpConnectSynSend);
-    kcpInited_ = true;
+
     kcpcb_  = ikcp_create(conv_, this);
     ikcp_setoutput(kcpcb_, kcpOutput);
     ikcp_nodelay(kcpcb_, 1, 200, 2, 1);
@@ -270,9 +275,6 @@ void TkcpConnection::initKcp() {
     nextKcpTime_ = ikcp_update(kcpcb_, TimestampToMillisecond(Timestamp::now()));
     updateKcpTimer_ = loop_->runEvery(MillisecondToSecond(50),
                     boost::bind(&TkcpConnection::onUpdateKcp, this));
-
-    setState(kConnected);
-    tkcpConnectionCallback_(shared_from_this());
 }
 
 void TkcpConnection::onPingRequest() {
@@ -358,8 +360,8 @@ void TkcpConnection::onTcpMessage(const TcpConnectionPtr& conn, Buffer* buf, Tim
                 case packet::tcp::kData:
                     onTcpData(buf);
                     break;
-                case packet::tcp::KUseTcp:
-                    onUseTcp(buf);
+                case packet::tcp::KTransportMode:
+                    onTransportMode(buf);
                     break;
                 case packet::tcp::kUdpConnectionInfo:
                     onUdpconnectionInfo(buf);
@@ -396,10 +398,10 @@ void TkcpConnection::sendConnectSyn(){
             LOG_INFO << "client trySendConnectSynTimes >= 15";
             LOG_INFO << "user tcp ";
 
+            packet::tcp::TransportMode mode;
             Buffer sendbuf(32);
-            EncodeUint16(&sendbuf, packet::tcp::kPacketHeadLength);
-            EncodeUint8(&sendbuf, packet::tcp::KUseTcp);
-            tcpConnectionPtr_->send(&sendbuf);
+            mode.packetId = packet::tcp::TcpPacketId::KTransportMode;
+            mode.mode = packet::tcp::TransportMode::KTcp;
             udpAvailble_ = false;
             setState(kConnected);
             tkcpConnectionCallback_(shared_from_this());
@@ -443,6 +445,9 @@ void TkcpConnection::onTcpPingReply(Buffer *buf) {
 void TkcpConnection::onTcpData(Buffer* buf) {
     assert(state_ == kConnected);
     assert(udpAvailble_ == false);
+    if (udpAvailble_) {
+        return;
+    }
     uint16_t len = DecodeUint16(buf);
     buf->retrieveInt8();
     size_t dataSize = len - packet::tcp::kPacketHeadLength;
@@ -452,9 +457,16 @@ void TkcpConnection::onTcpData(Buffer* buf) {
     tkcpMessageCallback_(shared_from_this(), &message);
 }
 
-void TkcpConnection::onUseTcp(Buffer* buf) {
-    buf->retrieve(packet::tcp::KUseTcp);
-    udpAvailble_ = false;
+void TkcpConnection::onTransportMode(Buffer* buf) {
+    packet::tcp::TransportMode mode;
+    mode.Decode(buf);
+
+    if (mode.mode == packet::tcp::TransportMode::kUdp) {
+       initKcp();
+    } else {
+        udpAvailble_ = false;
+    }
+
     setState(kConnected);
     tkcpConnectionCallback_(shared_from_this());
 }

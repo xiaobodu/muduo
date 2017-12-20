@@ -102,7 +102,7 @@ namespace net {
             //for tcp begin
             void onUdpconnectionInfo(Buffer* buf);
             void onTcpData(Buffer* buf);
-            void onUseTcp(Buffer* buf);
+            void onTransportMode(Buffer* buf);
             void tcpPingRequest();
             void onTcpPingRequest(Buffer* buf);
             void onTcpPingReply(Buffer* buf);

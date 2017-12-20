@@ -19,6 +19,22 @@ namespace net {
 namespace packet {
 
 namespace tcp {
+    
+void TransportMode::Encode(Buffer* buf) {
+    EncodeUint16(buf, static_cast<uint16_t>(Size()));
+    EncodeUint8(buf, packetId);
+    EncodeUint8(buf, mode);
+}
+
+void TransportMode::Decode(Buffer* buf) {
+    len = DecodeUint16(buf);
+    packetId = DecodeUint8(buf);
+    mode = DecodeUint8(buf);
+}
+
+size_t TransportMode::Size() {
+    return kPacketHeadLength + sizeof(mode);
+}
 
 
 void UdpConnectionInfo::Encode(Buffer* buf) {
@@ -43,6 +59,8 @@ string  PacketIdToString(uint8_t packetId) {
             return "kUdpConnectionInfo";
         case kData:
             return "kData";
+        case KTransportMode:
+            return "KTransportMode";
         case kPingRequest:
             return "KPingRequest";
         case kPingReply:
